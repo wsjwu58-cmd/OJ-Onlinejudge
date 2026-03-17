@@ -9,74 +9,36 @@ OJ在线判题系统 - 项目总结文档
 ### 1.2 项目结构
 
 ```
-d:\vue\vue-project1\
-├── src/                              # 用户端源码
-│   ├── api/                          # API接口封装
-│   ├── assets/                       # 静态资源
-│   ├── components/                   # 公共组件
-│   ├── router/                       # 路由配置
-│   ├── store/                        # 状态管理
-│   ├── utils/                        # 工具函数
-│   └── views/                        # 页面组件
-│       ├── HomePage.vue              # 首页
-│       ├── ProblemList.vue           # 题目列表
-│       ├── ProblemDetailView.vue     # 题目详情
-│       ├── ContestList.vue           # 比赛列表
-│       ├── ContestDetail.vue         # 比赛详情
-│       ├── GroupList.vue             # 题组列表
-│       ├── GroupDetail.vue           # 题组详情
-│       ├── SubmissionList.vue        # 提交记录
-│       ├── ProfileView.vue           # 个人主页
-│       └── Login.vue                 # 登录注册
-│
-├── vue-Element/                      # 管理端源码
-│   ├── src/
-│   │   ├── api/                      # API接口封装
-│   │   ├── components/               # 公共组件
-│   │   ├── router/                   # 路由配置
-│   │   └── views/                    # 页面组件
-│   │       ├── Dashboard.vue         # 工作台
-│   │       ├── Problems.vue          # 题目管理
-│   │       ├── CreateProblem.vue     # 创建题目
-│   │       ├── Users.vue             # 用户管理
-│   │       ├── Contests.vue          # 比赛管理
-│   │       ├── Groups.vue            # 题组管理
-│   │       ├── Submissions.vue       # 提交记录
-│   │       ├── Categories.vue        # 分类管理
-│   │       ├── Statistics.vue        # 数据统计
-│   │       └── Knowledge.vue         # 知识库管理
-│   │
-│   └── sky-take-out-old/             # 后端服务
-│       ├── sky-common/               # 公共模块
-│       │   └── src/main/java/com/sky/
-│       │       ├── constant/         # 常量定义
-│       │       ├── context/          # 上下文
-│       │       ├── enumeration/      # 枚举类
-│       │       ├── exception/        # 异常类
-│       │       ├── properties/       # 配置属性
-│       │       ├── result/           # 统一返回
-│       │       └── utils/            # 工具类
-│       │
-│       ├── sky-pojo/                 # 实体模块
-│       │   └── src/main/java/com/sky/
-│       │       ├── dto/              # 数据传输对象
-│       │       ├── entity/           # 实体类
-│       │       └── vo/               # 视图对象
-│       │
-│       └── sky-server/               # 服务模块
-│           └── src/main/java/com/sky/
-│               ├── config/           # 配置类
-│               ├── controller/       # 控制器
-│               │   ├── admin/        # 管理端接口
-│               │   └── User/         # 用户端接口
-│               ├── mapper/           # 数据访问层
-│               ├── mq/               # 消息队列消费者
-│               ├── service/          # 服务层
-│               └── websocket/        # WebSocket服务
-│
-├── package.json                      # 用户端依赖配置
-├── vite.config.js                    # Vite配置
-└── PROJECT_SUMMARY.md                # 本文档
+sky-common/
+└── src/main/java/com/sky/
+    ├── constant/         # 常量定义（如 MqConstant、MessageConstant）
+    ├── context/          # 上下文（如 BaseContext）
+    ├── enumeration/      # 枚举类（如 ActivityType）
+    ├── exception/        # 异常类（如 BaseException）
+    ├── properties/       # 配置属性（如 JwtProperties）
+    ├── result/           # 统一返回（如 Result、PageResult）
+    └── utils/            # 工具类（如 JwtUtil、AliOssUtil）
+sky-pojo/
+└── src/main/java/com/sky/
+    ├── dto/              # 数据传输对象（如 JudgeTaskMessage、DatabaseUpdateMessage）
+    ├── entity/           # 实体类（如 Problem、Submission、TestCase）
+    └── vo/               # 视图对象（如 JudgeResultVO、ContestVO）
+sky-server/
+└── src/main/java/com/sky/
+    ├── config/           # 配置类（如 Judge0Client、RedisConfiguration）
+    ├── controller/       # 控制器
+    │   ├── admin/        # 管理端接口（如 ProblemController、ContestController）
+    │   └── User/         # 用户端接口（如 JudgeController、SubmissionController）
+    ├── mapper/           # 数据访问层（如 ProblemMapper、SubMissionMapper）
+    ├── mq/               # 消息队列消费者
+    │   ├── JudgeTaskConsumer.java           # 判题任务消费者
+    │   ├── DatabaseUpdateConsumer.java      # 数据库更新消费者
+    │   ├── JudgeTaskDeadLetterConsumer.java # 判题任务死信队列消费者
+    │   └── DatabaseUpdateDeadLetterConsumer.java # 数据库更新死信队列消费者
+    ├── service/          # 服务层
+    │   ├── impl/         # 服务实现（如 JudgeServiceImpl）
+    │   └── 接口定义       # 服务接口
+    └── websocket/        # WebSocket服务（如 WebSocketServer）
 ```
 
 ### 1.3 功能模块概览
