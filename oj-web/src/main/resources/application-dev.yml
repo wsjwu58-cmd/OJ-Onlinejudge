@@ -1,23 +1,23 @@
 sky:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    host: localhost
-    port: 3306
-    database: exercise
+    host: 
+    port: 
+    database: 
     username: root
-    password: qwer1234
+    password: 
   alioss:
-      endpoint: oss-cn-beijing.aliyuncs.com
-      access-key-id: LTAI5tM9m2ttz588LxyfZR9A
-      access-key-secret: VhkWLyiq6J658RjS8XjW2Tem4cdLcn
-      bucket-name: wsj123
+      endpoint: 
+      access-key-id: 
+      access-key-secret: 
+      bucket-name: 
   redis:
-    host: 192.168.141.128
+    host: 
     port: 6378
-    password: qwer1234
-    database: 0
+    password: 
+    database: 
   judge0:
-    api-url: http://192.168.141.128:2358    # 自建 Judge0 地址
+    api-url:    # 自建 Judge0 地址
     api-key:                          # 如果用 RapidAPI SaaS 版则填 key
     max-wait-seconds: 15
     poll-interval-ms: 500
@@ -29,15 +29,15 @@ sky:
     # SiliconFlow: https://api.siliconflow.cn
     base-url: https://api.siliconflow.cn
     # API Key（本地 Ollama 不需要，云端 API 必填）
-    api-key: sk-wotxcpcnxztkgrdqrzytqtmqxonxerxjuwgboptnplhrvbsi
+    api-key: 
     # 使用的模型名称
-    model: deepseek-ai/DeepSeek-V2.5
+    model: 
     embedding-model: BAAI/bge-large-zh-v1.5  # embedding 模型（新增）
     # 请求超时时间（毫秒）
     timeout: 120000
     # 是否启用流式响应（SSE）
     stream: true
   rocketmq:
-    name-server: 192.168.141.128:9876
+    name-server: 
 
 
