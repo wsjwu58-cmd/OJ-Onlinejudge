@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.mapper.CommentMapper">
+
+    <select id="selectVOByIdsOrdered" resultType="com.oj.vo.SolutionVO">
+        SELECT sc.*,
+        u.username AS username,
+        ru.username AS replyToUsername
+        FROM solution_comment sc
+        LEFT JOIN user u ON sc.user_id = u.id
+        LEFT JOIN user ru ON sc.reply_to_user_id = ru.id
+        WHERE sc.id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY FIELD(sc.id,
+        <foreach collection="ids" item="id" separator=",">
+            #{id}
+        </foreach>
+        )
+    </select>
+
+
+</mapper>

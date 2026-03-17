@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.mapper.ContestMapper">
+    <select id="selectPage" resultType="com.oj.vo.ContestVO">
+        select c.*,u.username as createdName  from contests c left join user u on c.created_by=u.id ${ew.customSqlSegment}
+    </select>
+    <select id="SelectById" resultType="com.oj.entity.Problem">
+        SELECT pt.*
+        FROM problems pt
+                 INNER JOIN contest_problems ptr ON pt.id = ptr.problem_id
+        WHERE ptr.contest_id = #{id}
+    </select>
+    <select id="CountContest" resultType="java.lang.Integer">
+        select  count(id) from contests
+        <where>
+            <if test="status!=null">
+                and status=#{status}
+            </if>
+        </where>
+    </select>
+
+
+</mapper>

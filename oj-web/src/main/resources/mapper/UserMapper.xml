@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.mapper.UserMapper">
+    <select id="countUserToday" resultType="java.lang.Integer">
+        select count(id) from exercise.user
+        <where>
+
+            <if test="begin!=null">
+                and last_login_time &gt;=#{begin}
+            </if>
+            <if test="end!=null">
+                and last_login_time &lt;=#{end}
+            </if>
+        </where>
+
+    </select>
+    <select id="countUserBeforeToday" resultType="java.lang.Integer">
+        select count(id) from exercise.user
+        where last_login_time &lt; #{localDate}
+
+    </select>
+
+    <select id="countCreateUser" resultType="java.lang.Integer">
+        select count(id) from exercise.user
+        <where>
+
+            <if test="begin!=null">
+                and created_at &gt;=#{begin}
+            </if>
+            <if test="end!=null">
+                and created_at &lt;=#{end}
+            </if>
+        </where>
+    </select>
+</mapper>

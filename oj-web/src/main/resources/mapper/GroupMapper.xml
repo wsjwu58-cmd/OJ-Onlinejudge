@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.mapper.GroupMapper">
+    <select id="selectPage" resultType="com.oj.vo.GroupVO">
+        select pg.*  from problem_groups pg ${ew.customSqlSegment}
+    </select>
+    <select id="SelectByID" resultType="com.oj.entity.Problem">
+        SELECT pt.*
+        FROM problems pt
+                 INNER JOIN group_problems ptr ON pt.id = ptr.problem_id
+        WHERE ptr.group_id = #{id}
+    </select>
+
+
+
+</mapper>

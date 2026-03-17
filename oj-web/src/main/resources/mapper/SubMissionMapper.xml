@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.mapper.SubMissionMapper">
+    <select id="countSubmission" resultType="java.lang.Integer">
+            select count(id) from submissions
+            <where>
+                <if test="begin!=null">
+                    and submit_time &gt;=#{begin}
+                </if>
+                <if test="end!=null">
+                    and submit_time &lt;=#{end}
+                </if>
+                <if test="status!=null">
+                    and status= #{status}
+                </if>
+            </where>
+
+    </select>
+</mapper>
