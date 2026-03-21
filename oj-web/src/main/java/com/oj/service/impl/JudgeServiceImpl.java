@@ -8,13 +8,13 @@ import com.alibaba.fastjson.JSONObject;
 import com.oj.dto.JudgeRunDTO;
 import com.oj.dto.JudgeSubmitDTO;
 import com.oj.dto.JudgeTaskMessage;
+import com.oj.dto.MaliciousCodeDetectionResult;
 import com.oj.entity.Problem;
 import com.oj.entity.TestCase;
 import com.oj.exception.BaseException;
 import com.oj.mapper.ProblemMapper;
 import com.oj.mapper.SubMissionMapper;
 import com.oj.mapper.TestCaseMapper;
-
 import com.oj.vo.JudgeResultVO;
 import com.oj.websocket.WebSocketServer;
 import lombok.extern.slf4j.Slf4j;
@@ -58,6 +58,9 @@ public class JudgeServiceImpl implements JudgeService {
     @Autowired
     private RocketMQTemplate rocketMQTemplate;
 
+    @Autowired
+    private com.oj.service.MaliciousCodeDetector maliciousCodeDetector;
+
     @Override
     public JudgeResultVO submit(JudgeSubmitDTO dto, Long userId) {
         Problem problem = problemMapper.selectById(dto.getProblemId());
@@ -84,37 +87,55 @@ public class JudgeServiceImpl implements JudgeService {
             throw new BaseException(MessageConstant.TESTCASE_NOT_FOUND);
         }
 
-        // 3. 生成本次提交的唯一 token
+        // 3. 恶意代码检测（正则检测，快速返回）
+        MaliciousCodeDetectionResult maliciousResult = maliciousCodeDetector.detect(dto.getCode(), dto.getLanguage());
+        if (!maliciousResult.isSafe()) {
+            log.warn("检测到恶意代码: userId={}, problemId={}, message={}", userId, dto.getProblemId(), maliciousResult.getMessage());
+            return JudgeResultVO.builder()
+                    .status("Malicious Code")
+                    .errorInfo("【安全检测】\n" + maliciousResult.getMessage())
+                    .testCasesPassed(0)
+                    .testCasesTotal(0)
+                    .problemId(dto.getProblemId())
+                    .build();
+        }
+
+        // 4. 生成本次提交的唯一 token
         String submissionToken = UUID.randomUUID().toString();
         long currentTime = System.currentTimeMillis() / 1000;
 
-        // 4. 执行 Lua 脚本：submit_and_update_v2
+        // 5. 执行 Lua 脚本：submit_and_update_v3
         // 比赛模式下 key 加 contest 前缀，与普通练习隔离
         String prefix = dto.getContestId() != null ? "contest:" + dto.getContestId() + ":" : "";
         String userStatusKey = prefix + "user:" + userId + ":problem:" + dto.getProblemId() + ":status";
         String solvedCountKey = prefix + "problem:" + dto.getProblemId() + ":solved_count";
         String submissionKey = "submission:" + submissionToken;
         String processingKey = prefix + "user:" + userId + ":problem:" + dto.getProblemId() + ":processing";
-        String submitCountKey = prefix + "user:" + userId + ":problem:" + dto.getProblemId() + ":submit_count";
-
+        String submitWindowKey = prefix + "user:" + userId + ":problem:" + dto.getProblemId() + ":submit_window";
         List<String> keys = Arrays.asList(
                 userStatusKey,
                 solvedCountKey,
                 submissionKey,
                 processingKey,
-                submitCountKey
+                submitWindowKey
         );
+
+        // 根据用户角色调整限流参数
+        int windowSize = 60;
+        int maxSubmits = 5;
 
         List<Object> luaResult = stringRedisTemplate.execute(
                 submitAndUpdateScript,
                 keys,
                 submissionToken,
-                String.valueOf(currentTime)
+                String.valueOf(currentTime),
+                String.valueOf(windowSize),
+                String.valueOf(maxSubmits)
         );
 
-        log.info("Lua submit_and_update_v2 结果: {}", luaResult);
+        log.info("Lua submit_and_update_v3 结果: {}", luaResult);
 
-        // 5. 处理 Lua 返回结果
+        // 6. 处理 Lua 返回结果
         if (luaResult == null || luaResult.size() < 2) {
             throw new BaseException(MessageConstant.LUA_EXECUTION_ERROR);
         }
@@ -125,9 +146,11 @@ public class JudgeServiceImpl implements JudgeService {
         // 限流
         if (success == 0 && "rate_limited".equals(status)) {
             int count = luaResult.size() >= 4 ? Integer.parseInt(luaResult.get(3).toString()) : 0;
+            int waitTime = luaResult.size() >= 5 ? Integer.parseInt(luaResult.get(4).toString()) : 0;
+            log.info("提交过于频繁，请" + waitTime + "秒后再试（窗口内已提交" + count + "次）");
             return JudgeResultVO.builder()
                     .status("Rate Limited")
-                    .errorInfo("提交过于频繁，请60秒后再试（已提交" + count + "次）")
+                    .errorInfo("提交过于频繁，请" + waitTime + "秒后再试（窗口内已提交" + count + "次）")
                     .testCasesPassed(0)
                     .testCasesTotal(0)
                     .problemId(dto.getProblemId())
@@ -148,12 +171,12 @@ public class JudgeServiceImpl implements JudgeService {
                     .build();
         }
 
-        // 6. 提交成功，获取 Judge0 语言ID 和限制
+        // 7. 提交成功，获取 Judge0 语言ID 和限制
         int languageId = judge0Client.getLanguageId(dto.getLanguage());
         Float timeLimit = problem.getTimeLimitMs() != null ? problem.getTimeLimitMs() / 1000.0f : null;
         Integer memoryLimit = problem.getMemoryLimitMb() != null ? problem.getMemoryLimitMb() * 1024 : null;
 
-        // 7. 构建判题任务消息
+        // 8. 构建判题任务消息
         JudgeTaskMessage taskMessage = JudgeTaskMessage.builder()
                 .userId(userId)
                 .problemId(dto.getProblemId())
@@ -167,12 +190,12 @@ public class JudgeServiceImpl implements JudgeService {
                 .contestId(dto.getContestId())
                 .build();
 
-        // 8. 发送到判题任务队列
+        // 9. 发送到判题任务队列
         rocketMQTemplate.convertAndSend(MqConstant.JUDGE_TASK_TOPIC, taskMessage);
         log.info("已发送判题任务到MQ: submissionToken={}, problemId={}, userId={}",
                 submissionToken, dto.getProblemId(), userId);
 
-        // 9. 立即返回 Pending 状态
+        // 10. 立即返回 Pending 状态
         return JudgeResultVO.builder()
                 .status("Pending")
                 .testCasesPassed(0)

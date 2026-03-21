@@ -7,6 +7,7 @@ import com.oj.dto.DatabaseUpdateMessage;
 import com.oj.dto.JudgeTaskMessage;
 import com.oj.entity.TestCase;
 import com.oj.mapper.TestCaseMapper;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
@@ -17,8 +18,11 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.stream.Collectors;
 
 /**
  * 判题消费者：从 MQ 消费判题任务
@@ -50,6 +54,9 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
     @Autowired
     private RocketMQTemplate rocketMQTemplate;
 
+    @Autowired
+    private Executor judgeExecutor;
+
     @Override
     public void onMessage(JudgeTaskMessage msg) {
         log.info("收到判题任务: submissionToken={}, problemId={}, userId={}",
@@ -60,67 +67,58 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
         if (testCases == null || testCases.isEmpty()) {
             log.error("题目 {} 没有测试用例，跳过", msg.getProblemId());
             sendDatabaseUpdate(msg, "Runtime Error", 0, 0, 0, 0, "该题目暂无测试用例", false);
-
             return;
         }
 
-        int passed = 0;
-        int total = testCases.size();
-        String finalStatus = "Accepted";
-        String errorInfo = null;
-        int maxRuntime = 0;
-        int maxMemory = 0;
-
-        // 2. 逐个测试用例提交 Judge0 并轮询
-        for (int i = 0; i < total; i++) {
+        // 2. 并行执行所有测试用例
+        List<CompletableFuture<TestCaseResult>> futures = new ArrayList<>();
+        for (int i = 0; i < testCases.size(); i++) {
+            final int index = i;
             TestCase tc = testCases.get(i);
-            try {
-                JSONObject result = judge0Client.submitAndWait(
-                        msg.getCode(),
-                        msg.getLanguageId(),
-                        tc.getInputData(),
-                        tc.getOutputData(),
-                        msg.getTimeLimitSec(),
-                        msg.getMemoryLimitKb()
-                );
-
-                JSONObject status = result.getJSONObject("status");
-                int statusId = status.getIntValue("id");
-
-                String timeStr = result.getString("time");
-                String memoryStr = result.getString("memory");
-                int runtime = timeStr != null ? (int) (Float.parseFloat(timeStr) * 1000) : 0;
-                int memory = memoryStr != null ? (int) Float.parseFloat(memoryStr) : 0;
-                maxRuntime = Math.max(maxRuntime, runtime);
-                maxMemory = Math.max(maxMemory, memory);
-
-                if (statusId == 3) {
-                    passed++;
-                } else {
-                    finalStatus = judge0Client.parseStatus(statusId);
-                    String stderr = judge0Client.decodeField(result, "stderr");
-                    String compileOutput = judge0Client.decodeField(result, "compile_output");
-                    String stdout = judge0Client.decodeField(result, "stdout");
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("测试用例 #").append(i + 1).append(" 失败\n");
-                    sb.append("输入: ").append(tc.getInputData()).append("\n");
-                    sb.append("期望输出: ").append(tc.getOutputData()).append("\n");
-                    if (stdout != null) sb.append("实际输出: ").append(stdout.trim()).append("\n");
-                    if (compileOutput != null) sb.append("编译信息: ").append(compileOutput).append("\n");
-                    if (stderr != null) sb.append("错误: ").append(stderr).append("\n");
-                    errorInfo = sb.toString();
-                    break;
-                }
-
-            } catch (Exception e) {
-                log.error("Judge0 判题异常, 测试用例#{}: {}", i + 1, e.getMessage());
-                finalStatus = "Runtime Error";
-                errorInfo = "测试用例 #" + (i + 1) + " 判题异常: " + e.getMessage();
-                break;
-            }
+            futures.add(CompletableFuture.supplyAsync(() ->
+                    runSingleTestCase(msg, tc, index), judgeExecutor));
         }
 
-        // 3. 执行 Lua 脚本：update_result_v2（原子性更新 Redis）
+        // 3. 等待所有测试用例完成
+        CompletableFuture<Void> allFutures = CompletableFuture.allOf(
+                futures.toArray(new CompletableFuture[0]));
+
+        TestCaseResult finalResult;
+        try {
+            // 设置超时时间：单个用例超时 * 总用例数 + 缓冲
+            int timeoutSec = msg.getTimeLimitSec() != null ? msg.getTimeLimitSec().intValue() : 10;
+            int totalTimeout = timeoutSec * testCases.size() + 30;
+            allFutures.get(totalTimeout, java.util.concurrent.TimeUnit.SECONDS);
+
+            // 收集所有结果
+            List<TestCaseResult> results = futures.stream()
+                    .map(CompletableFuture::join)
+                    .collect(Collectors.toList());
+
+            // 4. 汇总结果
+            finalResult = aggregateResults(results);
+
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.error("判题超时: submissionToken={}", msg.getSubmissionToken());
+            finalResult = new TestCaseResult();
+            finalResult.setStatus("Time Limit Exceeded");
+            finalResult.setErrorInfo("判题超时，可能存在无限循环");
+            finalResult.setMaxRuntime(0);
+            finalResult.setMaxMemory(0);
+            finalResult.setPassed(0);
+            finalResult.setTotal(testCases.size());
+        } catch (Exception e) {
+            log.error("判题异常: {}", e.getMessage(), e);
+            finalResult = new TestCaseResult();
+            finalResult.setStatus("Runtime Error");
+            finalResult.setErrorInfo("判题异常: " + e.getMessage());
+            finalResult.setMaxRuntime(0);
+            finalResult.setMaxMemory(0);
+            finalResult.setPassed(0);
+            finalResult.setTotal(testCases.size());
+        }
+
+        // 5. 执行 Lua 脚本：update_result_v2（原子性更新 Redis）
         // 比赛模式下 key 加 contest 前缀，与普通练习隔离
         String prefix = msg.getContestId() != null ? "contest:" + msg.getContestId() + ":" : "";
         String userStatusKey = prefix + "user:" + msg.getUserId() + ":problem:" + msg.getProblemId() + ":status";
@@ -143,14 +141,14 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
                 updateResultScript,
                 keys,
                 msg.getSubmissionToken(),
-                finalStatus,
-                String.valueOf(maxRuntime),
-                String.valueOf(maxMemory)
+                finalResult.getStatus(),
+                String.valueOf(finalResult.getMaxRuntime()),
+                String.valueOf(finalResult.getMaxMemory())
         );
 
-        log.info("Lua update_result_v2 结果: {}, finalStatus={}", luaResult, finalStatus);
+        log.info("Lua update_result_v2 结果: {}, finalStatus={}", luaResult, finalResult.getStatus());
 
-        // 4. 解析 Lua 返回值
+        // 6. 解析 Lua 返回值
         if (luaResult == null || luaResult.size() < 2) {
             log.error("Lua脚本返回值异常: {}", luaResult);
             return;
@@ -184,11 +182,143 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
             }
         }
 
-        // 5. 发送到数据库更新队列
-        sendDatabaseUpdate(msg, finalStatus, passed, total, maxRuntime, maxMemory, errorInfo, firstAc);
+        // 7. 发送到数据库更新队列
+        sendDatabaseUpdate(msg, finalResult.getStatus(), finalResult.getPassed(), finalResult.getTotal(),
+                finalResult.getMaxRuntime(), finalResult.getMaxMemory(), finalResult.getErrorInfo(), firstAc);
 
         log.info("判题完成: submissionToken={}, status={}, passed={}/{}, firstAc={}",
-                msg.getSubmissionToken(), finalStatus, passed, total, firstAc);
+                msg.getSubmissionToken(), finalResult.getStatus(),
+                finalResult.getPassed(), finalResult.getTotal(), firstAc);
+    }
+
+    /**
+     * 运行单个测试用例
+     */
+    private TestCaseResult runSingleTestCase(JudgeTaskMessage msg, TestCase tc, int index) {
+        try {
+            JSONObject result = judge0Client.submitAndWait(
+                    msg.getCode(),
+                    msg.getLanguageId(),
+                    tc.getInputData(),
+                    tc.getOutputData(),
+                    msg.getTimeLimitSec(),
+                    msg.getMemoryLimitKb()
+            );
+
+            JSONObject status = result.getJSONObject("status");
+            int statusId = status.getIntValue("id");
+
+            String timeStr = result.getString("time");
+            String memoryStr = result.getString("memory");
+            int runtime = timeStr != null ? (int) (Float.parseFloat(timeStr) * 1000) : 0;
+            int memory = memoryStr != null ? (int) Float.parseFloat(memoryStr) : 0;
+
+            TestCaseResult testCaseResult = new TestCaseResult();
+            testCaseResult.setStatusId(statusId);
+            testCaseResult.setRuntime(runtime);
+            testCaseResult.setMemory(memory);
+            testCaseResult.setTestCaseIndex(index);
+
+            // 获取详细信息
+            String stderr = judge0Client.decodeField(result, "stderr");
+            String compileOutput = judge0Client.decodeField(result, "compile_output");
+            String stdout = judge0Client.decodeField(result, "stdout");
+            testCaseResult.setStderr(stderr);
+            testCaseResult.setCompileOutput(compileOutput);
+            testCaseResult.setStdout(stdout);
+            testCaseResult.setInput(tc.getInputData());
+            testCaseResult.setExpectedOutput(tc.getOutputData());
+
+            return testCaseResult;
+
+        } catch (Exception e) {
+            log.error("Judge0 判题异常: {}", e.getMessage(), e);
+            TestCaseResult errorResult = new TestCaseResult();
+            errorResult.setStatusId(-1);  // -1 表示异常
+            errorResult.setErrorInfo("判题异常: " + e.getMessage());
+            return errorResult;
+        }
+    }
+
+    /**
+     * 汇总所有测试用例结果
+     */
+    private TestCaseResult aggregateResults(List<TestCaseResult> results) {
+        TestCaseResult finalResult = new TestCaseResult();
+        finalResult.setTotal(results.size());
+
+        int passed = 0;
+        int maxRuntime = 0;
+        int maxMemory = 0;
+        String finalStatus = "Accepted";
+        String errorInfo = null;
+
+        // 按测试用例索引排序，保证结果顺序
+        results.sort(Comparator.comparingInt(TestCaseResult::getTestCaseIndex));
+
+        for (int i = 0; i < results.size(); i++) {
+            TestCaseResult r = results.get(i);
+
+            // 更新最大运行时间和内存
+            maxRuntime = Math.max(maxRuntime, r.getRuntime());
+            maxMemory = Math.max(maxMemory, r.getMemory());
+
+            // 如果有异常或错误，直接返回
+            if (r.getStatusId() == -1) {
+                finalStatus = "Runtime Error";
+                errorInfo = r.getErrorInfo();
+                break;
+            }
+
+            // Judge0 status.id: 3=Accepted, 其他为失败
+            if (r.getStatusId() == 3) {
+                passed++;
+            } else {
+                // 第一个失败的测试用例决定最终状态
+                finalStatus = judge0Client.parseStatus(r.getStatusId());
+
+                // 构建错误信息
+                StringBuilder sb = new StringBuilder();
+                sb.append("测试用例 #").append(i + 1).append(" 失败\n");
+                sb.append("输入: ").append(r.getInput()).append("\n");
+                sb.append("期望输出: ").append(r.getExpectedOutput()).append("\n");
+                if (r.getStdout() != null) sb.append("实际输出: ").append(r.getStdout().trim()).append("\n");
+                if (r.getCompileOutput() != null) sb.append("编译信息: ").append(r.getCompileOutput()).append("\n");
+                if (r.getStderr() != null) sb.append("错误: ").append(r.getStderr()).append("\n");
+                errorInfo = sb.toString();
+                break;
+            }
+        }
+
+        finalResult.setStatus(finalStatus);
+        finalResult.setPassed(passed);
+        finalResult.setMaxRuntime(maxRuntime);
+        finalResult.setMaxMemory(maxMemory);
+        finalResult.setErrorInfo(errorInfo);
+
+        return finalResult;
+    }
+
+    /**
+     * 测试用例结果内部类
+     */
+    @Data
+    private static class TestCaseResult {
+        private String status;
+        private int statusId;
+        private int passed;
+        private int total;
+        private int maxRuntime;
+        private int maxMemory;
+        private String errorInfo;
+        private int runtime;
+        private int memory;
+        private int testCaseIndex;
+        private String input;
+        private String expectedOutput;
+        private String stdout;
+        private String stderr;
+        private String compileOutput;
     }
 
     /**
