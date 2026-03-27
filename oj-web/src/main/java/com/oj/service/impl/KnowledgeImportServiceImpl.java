@@ -1,19 +1,25 @@
 package com.oj.service.impl;
 
 import com.oj.service.KnowledgeImportService;
+import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.DocumentParser;
+import dev.langchain4j.data.document.DocumentSplitter;
+import dev.langchain4j.data.document.Metadata;
+import dev.langchain4j.data.document.loader.FileSystemDocumentLoader;
+import dev.langchain4j.data.document.parser.apache.pdfbox.ApachePdfBoxDocumentParser;
+import dev.langchain4j.data.document.splitter.DocumentSplitters;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.model.embedding.EmbeddingModel;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.store.embedding.EmbeddingStoreIngestor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
-import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -28,7 +34,10 @@ import java.util.stream.Stream;
 public class KnowledgeImportServiceImpl implements KnowledgeImportService {
 
     @Autowired
-    private VectorStore vectorStore;
+    private EmbeddingStore<TextSegment> embeddingStore;
+
+    @Autowired
+    private EmbeddingModel embeddingModel;
 
     @Override
     public int importPdf(MultipartFile file, String category) {
@@ -102,57 +111,44 @@ public class KnowledgeImportServiceImpl implements KnowledgeImportService {
     
     private int processPdfFile(Path pdfPath, String category, String sourceName) {
         try {
-            Resource pdfResource = new FileSystemResource(pdfPath.toFile());
-            PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(pdfResource);
-            List<Document> rawDocuments = pdfReader.get();
-
-            // Embedding 模型最多支持 512 token，使用 TokenTextSplitter 分块
-            // defaultChunkSize=350 token，保留 overlap 避免语义截断
-            TokenTextSplitter splitter = new TokenTextSplitter(350, 50, 5, 10000, true);
-
-            List<Document> chunkedDocuments = new ArrayList<>();
-
-            for (Document doc : rawDocuments) {
-                String content = doc.getText();
-                if (!StringUtils.hasText(content)) {
-                    continue;
-                }
-
-                // 先分块
-                List<Document> chunks = splitter.apply(List.of(doc));
-
-                for (Document chunk : chunks) {
-                    // 补充元数据
-                    Map<String, Object> metadata = new HashMap<>();
-                    metadata.put("category", category);
-                    metadata.put("source", sourceName);
-                    metadata.put("importTime", System.currentTimeMillis());
-                    if (doc.getMetadata() != null) {
-                        metadata.putAll(doc.getMetadata());
-                    }
-                    if (chunk.getMetadata() != null) {
-                        metadata.putAll(chunk.getMetadata());
-                    }
-                    chunkedDocuments.add(new Document(chunk.getText(), metadata));
-                }
+            DocumentParser parser = new ApachePdfBoxDocumentParser();
+            Document document = null;
+            
+            try (InputStream inputStream = Files.newInputStream(pdfPath)) {
+                document = parser.parse(inputStream);
             }
-
-            if (chunkedDocuments.isEmpty()) {
+            
+            if (document == null || !StringUtils.hasText(document.text())) {
                 log.warn("PDF文件 {} 未提取到有效内容", sourceName);
                 return 0;
             }
 
-            // 分批写入，每批 10 个，避免单次请求过大
-            int batchSize = 10;
-            for (int i = 0; i < chunkedDocuments.size(); i += batchSize) {
-                List<Document> batch = chunkedDocuments.subList(i, Math.min(i + batchSize, chunkedDocuments.size()));
-                vectorStore.add(batch);
-                log.info("已写入批次 {}/{}, 共 {} 个分块", (i / batchSize + 1),
-                        (int) Math.ceil((double) chunkedDocuments.size() / batchSize), batch.size());
+            DocumentSplitter splitter = DocumentSplitters.recursive(350, 50);
+            
+            List<TextSegment> segments = splitter.split(document);
+            List<Document> documentsToIngest = new ArrayList<>();
+            
+            for (TextSegment segment : segments) {
+                Map<String, Object> metadataMap = new HashMap<>();
+                metadataMap.put("category", category);
+                metadataMap.put("source", sourceName);
+                metadataMap.put("importTime", System.currentTimeMillis());
+                // 【关键修改】使用 Metadata 构造函数包装 Map，而不是强转
+                Metadata metadata = new Metadata(metadataMap);
+
+                Document doc = Document.from(segment.text(), metadata);
+                documentsToIngest.add(doc);
             }
 
-            log.info("PDF文件 {} 分块完成，共 {} 个分块", sourceName, chunkedDocuments.size());
-            return chunkedDocuments.size();
+
+            EmbeddingStoreIngestor.builder()
+                    .embeddingModel(embeddingModel)
+                    .embeddingStore(embeddingStore)
+                    .build()
+                    .ingest(documentsToIngest);
+
+            log.info("PDF文件 {} 分块完成，共 {} 个分块", sourceName, documentsToIngest.size());
+            return documentsToIngest.size();
 
         } catch (Exception e) {
             log.error("处理PDF文件失败: {}", pdfPath, e);

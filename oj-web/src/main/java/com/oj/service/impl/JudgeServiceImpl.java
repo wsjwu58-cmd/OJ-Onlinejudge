@@ -19,7 +19,7 @@ import com.oj.vo.JudgeResultVO;
 import com.oj.websocket.WebSocketServer;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
-import org.springframework.ai.chat.client.ChatClient;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -46,8 +46,8 @@ public class JudgeServiceImpl implements JudgeService {
     @Autowired
     private WebSocketServer webSocketServer;
 
-    @Autowired
-    private ChatClient.Builder chatClientBuilder;
+//    @Autowired
+//    private ChatClient.Builder chatClientBuilder;
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
@@ -264,57 +264,57 @@ public class JudgeServiceImpl implements JudgeService {
         }
     }
 
-    private String checkSyntaxWithAi(String code, String language) {
-        try {
-            ChatClient chatClient = chatClientBuilder.build();
-
-            String prompt = String.format("""
-                你是一位专业的代码语法检查助手，回答简洁准确。只检查语法错误，不分析逻辑问题。
-                
-                请严格按照以下格式回复：
-                - 如果代码有语法错误，请回复：语法错误：[具体错误描述]
-                - 如果代码没有语法错误，请回复：语法正确
-                
-                代码：
-```%s
-                %s
-```
-                """, language.toLowerCase(), code);
-
-            String response = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
-
-            if (response == null || response.isEmpty()) {
-                return null;
-            }
-
-            String lowerResponse = response.toLowerCase();
-            boolean hasError = lowerResponse.contains("语法错误")
-                    || lowerResponse.contains("syntax error")
-                    || lowerResponse.contains("编译错误")
-                    || lowerResponse.contains("compile error")
-                    || (lowerResponse.contains("错误") && !lowerResponse.contains("没有错误") && !lowerResponse.contains("无错误"));
-
-            boolean isCorrect = lowerResponse.contains("语法正确")
-                    || lowerResponse.contains("没有语法错误")
-                    || lowerResponse.contains("无语法错误")
-                    || lowerResponse.contains("代码语法正确");
-
-            if (isCorrect && !hasError) {
-                return null;
-            }
-
-            if (hasError) {
-                return response;
-            }
-
-            return null;
-
-        } catch (Exception e) {
-            log.error("AI语法检测异常: {}", e.getMessage());
-            return null;
-        }
-    }
+//    private String checkSyntaxWithAi(String code, String language) {
+//        try {
+//            ChatClient chatClient = chatClientBuilder.build();
+//
+//            String prompt = String.format("""
+//                你是一位专业的代码语法检查助手，回答简洁准确。只检查语法错误，不分析逻辑问题。
+//
+//                请严格按照以下格式回复：
+//                - 如果代码有语法错误，请回复：语法错误：[具体错误描述]
+//                - 如果代码没有语法错误，请回复：语法正确
+//
+//                代码：
+//```%s
+//                %s
+//```
+//                """, language.toLowerCase(), code);
+//
+//            String response = chatClient.prompt()
+//                    .user(prompt)
+//                    .call()
+//                    .content();
+//
+//            if (response == null || response.isEmpty()) {
+//                return null;
+//            }
+//
+//            String lowerResponse = response.toLowerCase();
+//            boolean hasError = lowerResponse.contains("语法错误")
+//                    || lowerResponse.contains("syntax error")
+//                    || lowerResponse.contains("编译错误")
+//                    || lowerResponse.contains("compile error")
+//                    || (lowerResponse.contains("错误") && !lowerResponse.contains("没有错误") && !lowerResponse.contains("无错误"));
+//
+//            boolean isCorrect = lowerResponse.contains("语法正确")
+//                    || lowerResponse.contains("没有语法错误")
+//                    || lowerResponse.contains("无语法错误")
+//                    || lowerResponse.contains("代码语法正确");
+//
+//            if (isCorrect && !hasError) {
+//                return null;
+//            }
+//
+//            if (hasError) {
+//                return response;
+//            }
+//
+//            return null;
+//
+//        } catch (Exception e) {
+//            log.error("AI语法检测异常: {}", e.getMessage());
+//            return null;
+//        }
+//    }
 }

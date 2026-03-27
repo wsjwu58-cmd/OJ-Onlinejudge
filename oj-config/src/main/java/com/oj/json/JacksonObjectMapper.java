@@ -1,5 +1,6 @@
 package com.oj.json;
 
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -47,5 +48,8 @@ public class JacksonObjectMapper extends ObjectMapper {
 
         //注册功能模块 例如，可以添加自定义序列化器和反序列化器
         this.registerModule(simpleModule);
+        // ✅【关键修复】禁用非 ASCII 字符（如 Emoji、特殊中文）的 XXXX 转义
+        // 这样 Emoji 就会直接显示为字符，而不是 \uD83C\uDFAD
+        this.configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, false);
     }
 }

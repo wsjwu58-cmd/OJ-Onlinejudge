@@ -1,5 +1,13 @@
 server:
   port: 8080
+  tomcat:
+    threads:
+      max: 500
+      min-spare: 50
+    max-connections: 10000
+    accept-count: 100
+    connection-timeout: 20000
+    async-request-timeout: 120000
 
 spring:
   profiles:
@@ -12,42 +20,55 @@ spring:
       url: jdbc:mysql://${sky.datasource.host}:${sky.datasource.port}/${sky.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=CONVERT_TO_NULL&useSSL=false&allowPublicKeyRetrieval=true&jdbcCompliantTruncation=false&allowPublicKeyRetrieval=true
       username: ${sky.datasource.username}
       password: ${sky.datasource.password}
+      # ✅ Druid 连接池配置
+      initial-size: 20             # 初始连接数
+      min-idle: 20                 # 最小空闲连接
+      max-active: 100              # 最大活跃连接（根据数据库承受能力）
+      max-wait: 5000               # 获取连接最大等待 5 秒
   data:
     redis:
       host: ${sky.redis.host}
-      port:  ${sky.redis.port}
+      port: ${sky.redis.port}
       password: ${sky.redis.password}
       database: ${sky.redis.database}
-#      lettuce:
-      client-type: jedis        # ← 加这一行！
+      client-type: jedis
       jedis:
         pool:
-          max-active: 10
-          max-idle: 10
-          min-idle: 1
+          max-active: 200
+          max-idle: 100
+          min-idle: 50
+          max-wait: 3000
           time-between-eviction-runs: 10s
+          test-on-borrow: false
+          test-on-return: false
+          test-while-idle: true
+          min-evictable-idle-time: 30m
   jackson:
-        default-property-inclusion: non_null # JSON处理时忽略非空字段
-  ai:
-    openai:
+    default-property-inclusion: non_null
+
+langchain4j:
+  open-ai:
+    chat-model:
       api-key: ${sky.ai.api-key}
       base-url: ${sky.ai.base-url}
-      chat:
-        options:
-          model: ${sky.ai.model}
-          temperature: 0.7
-      embedding:
-        options:
-          model: ${sky.ai.embedding-model}
-#    vectorstore:
-#      redis:
-#        uri: redis://${sky.redis.host}:${sky.redis.port}
-#        password: ${sky.redis.password}
-#        index: knowledge_index
-#        prefix: "knowledge:"
-#        initialize-schema: true
+      model-name: ${sky.ai.model}
+      temperature: 0.7
+      log-requests: true
+      log-responses: true
+    streaming-chat-model:
+      api-key: ${sky.ai.api-key}
+      base-url: ${sky.ai.base-url}
+      model-name: ${sky.ai.model}
+      temperature: 0.7
+      log-requests: true
+      log-responses: true
+    embedding-model:
+      api-key: ${sky.ai.api-key}
+      base-url: ${sky.ai.base-url}
+      model-name: ${sky.ai.embedding-model}
+      log-requests: true
+      log-responses: true
 
-# RocketMQ 配置
 rocketmq:
   name-server: ${sky.rocketmq.name-server}
   producer:
@@ -55,7 +76,6 @@ rocketmq:
     send-message-timeout: 10000
     retry-times-when-send-async-failed: 2
 
-# SpringDoc / Knife4j 配置
 springdoc:
   swagger-ui:
     path: /swagger-ui
@@ -72,30 +92,27 @@ knife4j:
     language: zh_cn
 
 mybatis:
-  #mapper配置文件
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.oj.entity
   configuration:
-    #开启驼峰命名
     map-underscore-to-camel-case: true
 
 logging:
   level:
     com:
-      sky:
+      oj:
         mapper: debug
         service: info
         controller: info
+#    dev.langchain4j: DEBUG
+#    com.oj.service.agent: DEBUG
 
 sky:
   jwt:
-    # 设置jwt签名加密时使用的秘钥（jjwt 0.12+ 要求 HS256 密钥至少 32 字节）
-    admin-secret-key: 
-    # 设置jwt过期时间
+    admin-secret-key: itcast-sky-take-out-admin-secret-key-2024
     admin-ttl: 7200000
-    # 设置前端传递过来的令牌名称
     admin-token-name: token
-    user-secret-key:
+    user-secret-key: itheima-sky-take-out-user-secret-key-2024
     user-ttl: 7200000
     user-token-name: authentication
   alioss:
@@ -104,10 +121,7 @@ sky:
     access-key-secret: ${sky.alioss.access-key-secret}
     bucket-name: ${sky.alioss.bucket-name}
 
-# 知识库配置
 knowledge:
   auto-import:
     enabled: false
     path: ./knowledge/pdfs/
-
-
