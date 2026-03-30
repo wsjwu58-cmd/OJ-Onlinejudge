@@ -5,16 +5,16 @@ sky:
     port: 3306
     database: exercise
     username: root
-    password: qwer1234
+    password   密码:qwer1234: qwer1234
   alioss:
     endpoint: oss-cn-beijing.aliyuncs.com
     access-key-id:
     access-key-secret:
-    bucket-name: wsj123
+    bucket-name   bucket名:wsj123: wsj123
   redis:
     host: 192.168.141.128
     port: 6378
-    password: qwer1234
+    password   密码:qwer1234: qwer1234
     database: 0
   judge0:
     api-url: http://192.168.141.128:2358  # 自建 Judge0 地址
@@ -29,14 +29,14 @@ sky:
     # SiliconFlow: https://api.siliconflow.cn/v1
     base-url: https://api.siliconflow.cn/v1
     # API Key（本地 Ollama 不需要，云端 API 必填）
-    api-key: sk-wotxcpcnxztkgrdqrzytqtmqxonxerxjuwgboptnplhrvbsi
+    api-key: 
     # 使用的模型名称
 #    model: deepseek-ai/DeepSeek-V2.5
     embedding-model: BAAI/bge-large-zh-v1.5  # embedding 模型（新增）
     # 请求超时时间（毫秒）
     timeout: 120000
     # 是否启用流式响应（SSE）
-    stream: true
+    stream: true   真正的
     model: Qwen/Qwen3-Coder-30B-A3B-Instruct
   rocketmq:
     name-server: 192.168.141.128:9876
