@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -38,16 +39,16 @@ public class GroupServiceImpl implements GroupService {
         //获取用户信息
         Long currentId = BaseContext.getCurrentId();
         //获取题单信息
-        ProblemGroup problemGroup=new ProblemGroup();
-        BeanUtils.copyProperties(groupDTO,problemGroup);
+        ProblemGroup problemGroup = new ProblemGroup();
+        BeanUtils.copyProperties(groupDTO, problemGroup);
         //设置基本信息
         problemGroup.setCreatorId(currentId);
         problemGroup.setCreatedAt(LocalDateTime.now());
         problemGroup.setUpdatedAt(LocalDateTime.now());
         groupMapper.insert(problemGroup);
         //获取题目信息
-        List<Problem> problemList=groupDTO.getProblemList();
-        if(problemList!=null&&!problemList.isEmpty()) {
+        List<Problem> problemList = groupDTO.getProblemList();
+        if (problemList != null && !problemList.isEmpty()) {
             List<GroupProblems> groupProblemsList = problemList.stream().map(problem -> {
                 GroupProblems groupProblems = new GroupProblems();
                 groupProblems.setGroupId(problemGroup.getId());
@@ -62,24 +63,24 @@ public class GroupServiceImpl implements GroupService {
 
     @Override
     public PageResult pageGroup(GroupQueryDTO groupQueryDTO) {
-        Page<GroupVO> groupVOPage=groupQueryDTO.ToPageDefaultSortByCreateTime("created_at");
+        Page<GroupVO> groupVOPage = groupQueryDTO.ToPageDefaultSortByCreateTime("created_at");
         //构造器
-        LambdaQueryWrapper<ProblemGroup> lambdaQueryWrapper=new LambdaQueryWrapper<>();
-        String title=groupQueryDTO.getTitle();
-        lambdaQueryWrapper.like(title!=null&&!title.isEmpty(),ProblemGroup::getTitle,title);
-        Page<GroupVO> page=groupMapper.selectPage(groupVOPage,lambdaQueryWrapper);
-        return new PageResult(page.getTotal(),page.getRecords());
+        LambdaQueryWrapper<ProblemGroup> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        String title = groupQueryDTO.getTitle();
+        lambdaQueryWrapper.like(title != null && !title.isEmpty(), ProblemGroup::getTitle, title);
+        Page<GroupVO> page = groupMapper.selectPage(groupVOPage, lambdaQueryWrapper);
+        return new PageResult(page.getTotal(), page.getRecords());
     }
 
     @Override
     public GroupVO selectId(Long id) {
         //根据ID查询题单数据
         ProblemGroup problemGroup = groupMapper.selectById(id);
-        GroupVO groupVO=new GroupVO();
-        if(problemGroup!=null){
-            BeanUtils.copyProperties(problemGroup,groupVO);
+        GroupVO groupVO = new GroupVO();
+        if (problemGroup != null) {
+            BeanUtils.copyProperties(problemGroup, groupVO);
         }
-        List<Problem> list=groupMapper.SelectByID(id);
+        List<Problem> list = groupMapper.SelectByID(id);
         groupVO.setProblemList(list);
         return groupVO;
 
@@ -88,8 +89,8 @@ public class GroupServiceImpl implements GroupService {
     @Override
     public void update(GroupDTO groupDTO) {
         //修改题单基本数据
-        ProblemGroup problemGroup=new ProblemGroup();
-        BeanUtils.copyProperties(groupDTO,problemGroup);
+        ProblemGroup problemGroup = new ProblemGroup();
+        BeanUtils.copyProperties(groupDTO, problemGroup);
         groupMapper.updateById(problemGroup);
         //删除题单和题目关联数据
         List<Problem> problemList = groupDTO.getProblemList();
@@ -109,7 +110,7 @@ public class GroupServiceImpl implements GroupService {
     @Override
     public void deleteId(Long id) {
         //如果题单中有发布的题目，则不能删除
-        List<Long> ids=groupProblemMapper.selectListAll(id);
+        List<Long> ids = groupProblemMapper.selectListAll(id);
         List<Problem> list = ids.stream().map(id1 -> {
             Problem problem = problemMapper.selectById(id1);
             if (problem.getStatus() == StatusConstant.ENABLE) {
@@ -117,19 +118,44 @@ public class GroupServiceImpl implements GroupService {
             }
             return problem;
         }).toList();
-        if(!list.isEmpty()){
+        if (!list.isEmpty()) {
             groupMapper.deleteById(id);
             groupProblemMapper.deleteProblem(Math.toIntExact(id));
-        }else{
+        } else {
             groupMapper.deleteById(id);
         }
     }
 
     @Override
     public void status(Integer status, Long id) {
-        ProblemGroup problemGroup=new ProblemGroup();
+        ProblemGroup problemGroup = new ProblemGroup();
         problemGroup.setStatus(status);
         problemGroup.setId(Math.toIntExact(id));
         groupMapper.updateById(problemGroup);
     }
+
+    @Override
+    public List<Problem> getGroupProblems(Long groupId, GroupQueryDTO groupQueryDTO) {
+        // 先查询题单包含的所有题目ID
+        List<GroupProblems> groupProblemsList = groupProblemMapper.selectByGroupId(groupId);
+        if (groupProblemsList == null || groupProblemsList.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 提取题目ID列表
+        List<Integer> problemIds = groupProblemsList.stream()
+                .map(GroupProblems::getProblemId)
+                .toList();
+
+
+        LambdaQueryWrapper<Problem> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.in(Problem::getId, problemIds);
+        lambdaQueryWrapper.eq(Problem::getStatus, StatusConstant.ENABLE);
+        List<Problem> problems = problemMapper.selectList(lambdaQueryWrapper);
+
+
+        return problems;
+    }
 }
+
+

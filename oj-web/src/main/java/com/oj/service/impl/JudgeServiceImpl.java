@@ -59,7 +59,7 @@ public class JudgeServiceImpl implements JudgeService {
     private RocketMQTemplate rocketMQTemplate;
 
     @Autowired
-    private com.oj.service.MaliciousCodeDetector maliciousCodeDetector;
+    private com.oj.service.EnhancedMaliciousCodeDetector maliciousCodeDetector;
 
     @Override
     public JudgeResultVO submit(JudgeSubmitDTO dto, Long userId) {

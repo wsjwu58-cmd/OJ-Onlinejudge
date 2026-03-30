@@ -25,4 +25,6 @@ public interface UserService {
     Result signout();
 
     Result signCount();
+
+    Result signDays(int year, int month);
 }

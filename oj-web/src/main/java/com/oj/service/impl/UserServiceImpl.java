@@ -17,6 +17,8 @@ import com.oj.entity.User;
 import com.oj.enumeration.ActivityType;
 import com.oj.exception.AccountLockedException;
 import com.oj.exception.AccountNotFoundException;
+import com.oj.entity.Submission;
+import com.oj.mapper.SubMissionMapper;
 import com.oj.mapper.UserMapper;
 import com.oj.result.PageResult;
 import com.oj.result.Result;
@@ -40,6 +42,8 @@ public class UserServiceImpl implements UserService {
     private UserMapper userMapper;
     @Autowired
     private WorkSpaceService workSpaceService;
+    @Autowired
+    private SubMissionMapper subMissionMapper;
 
     @Autowired
     private StringRedisTemplate redisTemplate;
@@ -249,5 +253,35 @@ public class UserServiceImpl implements UserService {
             num >>>= 1;
         }
         return Result.success(count);
+    }
+
+    @Override
+    public Result signDays(int year, int month) {
+        Long userId = BaseContext.getCurrentId();
+        String keySuffix = String.format(":%04d%02d", year, month);
+        String key = RedisConstant.USER_SIGN_KEY + userId + keySuffix;
+        
+        java.time.YearMonth yearMonth = java.time.YearMonth.of(year, month);
+        int daysInMonth = yearMonth.lengthOfMonth();
+        
+        List<Long> result = redisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(daysInMonth)).valueAt(0)
+        );
+        
+        List<Integer> signedDays = new ArrayList<>();
+        if (result != null && !result.isEmpty()) {
+            Long num = result.get(0);
+            if (num != null && num != 0) {
+                for (int day = 1; day <= daysInMonth; day++) {
+                    if ((num & 1) == 1) {
+                        signedDays.add(day);
+                    }
+                    num >>>= 1;
+                }
+            }
+        }
+        return Result.success(signedDays);
     }
 }
