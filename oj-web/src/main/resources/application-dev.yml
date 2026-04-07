@@ -5,16 +5,16 @@ sky:
     port: 3306
     database: exercise
     username: root
-    password   密码:qwer1234: qwer1234
+    password : qwer1234
   alioss:
     endpoint: oss-cn-beijing.aliyuncs.com
-    access-key-id:
-    access-key-secret:
-    bucket-name   bucket名:wsj123: wsj123
+    access-key-id: LTAI5tM9m2ttz588LxyfZR9A
+    access-key-secret: VhkWLyiq6J658RjS8XjW2Tem4cdLcn
+    bucket-name : wsj123
   redis:
     host: 192.168.141.128
     port: 6378
-    password   密码:qwer1234: qwer1234
+    password : qwer1234
     database: 0
   judge0:
     api-url: http://192.168.141.128:2358  # 自建 Judge0 地址
@@ -29,17 +29,28 @@ sky:
     # SiliconFlow: https://api.siliconflow.cn/v1
     base-url: https://api.siliconflow.cn/v1
     # API Key（本地 Ollama 不需要，云端 API 必填）
-    api-key: 
+    api-key: sk-wotxcpcnxztkgrdqrzytqtmqxonxerxjuwgboptnplhrvbsi
     # 使用的模型名称
 #    model: deepseek-ai/DeepSeek-V2.5
     embedding-model: BAAI/bge-large-zh-v1.5  # embedding 模型（新增）
     # 请求超时时间（毫秒）
     timeout: 120000
     # 是否启用流式响应（SSE）
-    stream: true   真正的
+    stream: true
     model: Qwen/Qwen3-Coder-30B-A3B-Instruct
   rocketmq:
     name-server: 192.168.141.128:9876
+  # MCP (Model Context Protocol) 配置
+  mcp:
+    brave-search:
+      enabled: false  # 设置为true启用Brave Search
+      api-key: YOUR_BRAVE_SEARCH_API_KEY  # 请替换为你的Brave Search API Key
+      base-url: https://api.search.brave.com/mcp
+    qianfan-search:
+      enabled: true  # 设置为true启用百度千帆搜索
+      api-key: bce-v3/ALTAK-98udrrAcGX5uKvfMECpYK/a538c2209999202d7853046dcf0462201bad46a4  # 请替换为你的百度千帆API Key
+      secret-key: bce-v3/ALTAK-98udrrAcGX5uKvfMECpYK/a538c2209999202d7853046dcf0462201bad46a4 # 请替换为你的百度千帆Secret Key
+      base-url: https://aip.baidubce.com
 
 
 

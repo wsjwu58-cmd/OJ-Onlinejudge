@@ -1,6 +1,7 @@
 package com.oj.service.tools;
 
 import com.oj.service.KnowledgeRetrievalService;
+import com.oj.exception.ParameterMissingException;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import org.slf4j.Logger;
@@ -60,6 +61,9 @@ public class KnowledgeRetrievalTool {
             @P("题目ID") Integer problemId,
             @P("用户的具体问题") String question) {
         log.info("Tool调用: searchProblemKnowledge, problemId={}, question={}", problemId, question);
+        if (problemId == null) {
+            throw new ParameterMissingException("problemId");
+        }
         try {
             String context = "题目ID: " + problemId;
             List<String> knowledgeList = knowledgeRetrievalService.retrieveKnowledge(
@@ -81,7 +85,7 @@ public class KnowledgeRetrievalTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("题目知识检索失败", e);
-            return "题目知识检索失败: " + e.getMessage();
+            throw new RuntimeException("题目知识检索失败: " + e.getMessage(), e);
         }
     }
 

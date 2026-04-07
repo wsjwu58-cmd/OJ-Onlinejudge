@@ -1,6 +1,7 @@
 package com.oj.service.tools;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.oj.exception.ParameterMissingException;
 import com.oj.entity.Problem;
 import com.oj.entity.Submission;
 import com.oj.mapper.ProblemMapper;
@@ -32,6 +33,9 @@ public class LearningAnalyzerTool {
             @P("用户ID") Long userId,
             @P("统计天数，如7表示最近7天") Integer days) {
         log.info("Tool调用: getUserSubmissionStats, userId={}, days={}", userId, days);
+        if (userId == null) {
+            throw new ParameterMissingException("userId");
+        }
         try {
             LocalDateTime startTime = LocalDateTime.now().minusDays(days);
             LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
@@ -70,13 +74,16 @@ public class LearningAnalyzerTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("获取用户提交统计失败", e);
-            return "获取用户提交统计失败: " + e.getMessage();
+            throw new RuntimeException("获取用户提交统计失败: " + e.getMessage(), e);
         }
     }
 
     @Tool("获取用户已解决和未解决的题目列表")
     public String getUserProblemProgress(@P("用户ID") Long userId) {
         log.info("Tool调用: getUserProblemProgress, userId={}", userId);
+        if (userId == null) {
+            throw new ParameterMissingException("userId");
+        }
         try {
             LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(Submission::getUserId, userId);
@@ -104,13 +111,16 @@ public class LearningAnalyzerTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("获取用户题目进度失败", e);
-            return "获取用户题目进度失败: " + e.getMessage();
+            throw new RuntimeException("获取用户题目进度失败: " + e.getMessage(), e);
         }
     }
 
     @Tool("分析用户的学习薄弱点，包括难度分布和错误类型")
     public String analyzeWeakness(@P("用户ID") Long userId) {
         log.info("Tool调用: analyzeWeakness, userId={}", userId);
+        if (userId == null) {
+            throw new ParameterMissingException("userId");
+        }
         try {
             LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(Submission::getUserId, userId);
@@ -176,13 +186,16 @@ public class LearningAnalyzerTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("分析用户薄弱点失败", e);
-            return "分析用户薄弱点失败: " + e.getMessage();
+            throw new RuntimeException("分析用户薄弱点失败: " + e.getMessage(), e);
         }
     }
 
     @Tool("生成用户的学习报告和建议")
     public String generateLearningReport(@P("用户ID") Long userId) {
         log.info("Tool调用: generateLearningReport, userId={}", userId);
+        if (userId == null) {
+            throw new ParameterMissingException("userId");
+        }
         try {
             String stats = getUserSubmissionStats(userId, 30);
             String progress = getUserProblemProgress(userId);
@@ -197,7 +210,7 @@ public class LearningAnalyzerTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("生成学习报告失败", e);
-            return "生成学习报告失败: " + e.getMessage();
+            throw new RuntimeException("生成学习报告失败: " + e.getMessage(), e);
         }
     }
 }

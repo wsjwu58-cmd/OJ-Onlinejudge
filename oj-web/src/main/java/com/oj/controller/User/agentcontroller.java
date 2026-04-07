@@ -3,6 +3,7 @@ package com.oj.controller.User;
 import com.oj.dto.AgentRequestDTO;
 import com.oj.result.Result;
 import com.oj.service.agent.AgentService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,7 @@ public class agentcontroller {
 
     @Autowired
     private AgentService agentService;
+
 
     @PostMapping("/chat/stream")
     @Operation(summary = "AI智能对话", description = "用户输入自然语言，AI自动识别意图并调用工具")

@@ -1,6 +1,7 @@
 package com.oj.service.impl;
 
 import com.oj.config.Judge0Client;
+import com.oj.config.JudgeMetrics;
 import com.oj.constant.MqConstant;
 import com.oj.constant.MessageConstant;
 import com.oj.service.JudgeService;
@@ -61,9 +62,17 @@ public class JudgeServiceImpl implements JudgeService {
     @Autowired
     private com.oj.service.EnhancedMaliciousCodeDetector maliciousCodeDetector;
 
+    @Autowired
+    private JudgeMetrics judgeMetrics;
+
     @Override
     public JudgeResultVO submit(JudgeSubmitDTO dto, Long userId) {
+        long totalStart = System.currentTimeMillis();
+
+        long startTime = System.currentTimeMillis();
         Problem problem = problemMapper.selectById(dto.getProblemId());
+        judgeMetrics.recordProblemQuery(System.currentTimeMillis() - startTime);
+
         if (problem == null) {
             throw new BaseException("题目不存在: " + dto.getProblemId());
         }
@@ -81,13 +90,14 @@ public class JudgeServiceImpl implements JudgeService {
 //                    .build();
 //        }
 
-        // 2. 获取测试用例
+        startTime = System.currentTimeMillis();
         List<TestCase> testCases = testCaseMapper.selectByProblemId(dto.getProblemId());
+        judgeMetrics.recordTestCaseQuery(System.currentTimeMillis() - startTime);
+
         if (testCases == null || testCases.isEmpty()) {
             throw new BaseException(MessageConstant.TESTCASE_NOT_FOUND);
         }
 
-        // 3. 恶意代码检测（正则检测，快速返回）
         MaliciousCodeDetectionResult maliciousResult = maliciousCodeDetector.detect(dto.getCode(), dto.getLanguage());
         if (!maliciousResult.isSafe()) {
             log.warn("检测到恶意代码: userId={}, problemId={}, message={}", userId, dto.getProblemId(), maliciousResult.getMessage());
@@ -100,12 +110,9 @@ public class JudgeServiceImpl implements JudgeService {
                     .build();
         }
 
-        // 4. 生成本次提交的唯一 token
         String submissionToken = UUID.randomUUID().toString();
         long currentTime = System.currentTimeMillis() / 1000;
 
-        // 5. 执行 Lua 脚本：submit_and_update_v3
-        // 比赛模式下 key 加 contest 前缀，与普通练习隔离
         String prefix = dto.getContestId() != null ? "contest:" + dto.getContestId() + ":" : "";
         String userStatusKey = prefix + "user:" + userId + ":problem:" + dto.getProblemId() + ":status";
         String solvedCountKey = prefix + "problem:" + dto.getProblemId() + ":solved_count";
@@ -120,10 +127,10 @@ public class JudgeServiceImpl implements JudgeService {
                 submitWindowKey
         );
 
-        // 根据用户角色调整限流参数
         int windowSize = 60;
         int maxSubmits = 5;
 
+        startTime = System.currentTimeMillis();
         List<Object> luaResult = stringRedisTemplate.execute(
                 submitAndUpdateScript,
                 keys,
@@ -132,10 +139,10 @@ public class JudgeServiceImpl implements JudgeService {
                 String.valueOf(windowSize),
                 String.valueOf(maxSubmits)
         );
+        judgeMetrics.recordRedisLimit(System.currentTimeMillis() - startTime);
 
         log.info("Lua submit_and_update_v3 结果: {}", luaResult);
 
-        // 6. 处理 Lua 返回结果
         if (luaResult == null || luaResult.size() < 2) {
             throw new BaseException(MessageConstant.LUA_EXECUTION_ERROR);
         }
@@ -143,7 +150,6 @@ public class JudgeServiceImpl implements JudgeService {
         int success = Integer.parseInt(luaResult.get(0).toString());
         String status = luaResult.get(1).toString();
 
-        // 限流
         if (success == 0 && "rate_limited".equals(status)) {
             int count = luaResult.size() >= 4 ? Integer.parseInt(luaResult.get(3).toString()) : 0;
             int waitTime = luaResult.size() >= 5 ? Integer.parseInt(luaResult.get(4).toString()) : 0;
@@ -157,7 +163,6 @@ public class JudgeServiceImpl implements JudgeService {
                     .build();
         }
 
-        // 有提交正在判题中
         if (success == 0 && "already_processing".equals(status)) {
             String existingToken = luaResult.get(2) != null ? luaResult.get(2).toString() : "";
             return JudgeResultVO.builder()
@@ -171,12 +176,10 @@ public class JudgeServiceImpl implements JudgeService {
                     .build();
         }
 
-        // 7. 提交成功，获取 Judge0 语言ID 和限制
         int languageId = judge0Client.getLanguageId(dto.getLanguage());
         Float timeLimit = problem.getTimeLimitMs() != null ? problem.getTimeLimitMs() / 1000.0f : null;
         Integer memoryLimit = problem.getMemoryLimitMb() != null ? problem.getMemoryLimitMb() * 1024 : null;
 
-        // 8. 构建判题任务消息
         JudgeTaskMessage taskMessage = JudgeTaskMessage.builder()
                 .userId(userId)
                 .problemId(dto.getProblemId())
@@ -190,12 +193,15 @@ public class JudgeServiceImpl implements JudgeService {
                 .contestId(dto.getContestId())
                 .build();
 
-        // 9. 发送到判题任务队列
+        startTime = System.currentTimeMillis();
         rocketMQTemplate.convertAndSend(MqConstant.JUDGE_TASK_TOPIC, taskMessage);
+        judgeMetrics.recordMqSend(System.currentTimeMillis() - startTime);
+
         log.info("已发送判题任务到MQ: submissionToken={}, problemId={}, userId={}",
                 submissionToken, dto.getProblemId(), userId);
 
-        // 10. 立即返回 Pending 状态
+        judgeMetrics.recordJudgeSubmit(System.currentTimeMillis() - totalStart);
+
         return JudgeResultVO.builder()
                 .status("Pending")
                 .testCasesPassed(0)

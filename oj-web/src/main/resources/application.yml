@@ -11,7 +11,7 @@ server:
 
 spring:
   profiles:
-    active: dev
+    active: local
   main:
     allow-circular-references: true
   datasource:
@@ -39,10 +39,12 @@ spring:
           min-idle: 50
           max-wait: 3000
           time-between-eviction-runs: 10s
-          test-on-borrow: false
-          test-on-return: false
-          test-while-idle: true
-          min-evictable-idle-time: 30m
+      timeout: 5000ms
+
+  #          test-on-borrow: false
+#          test-on-return: false
+#          test-while-idle: true
+#          min-evictable-idle-time: 30m
   jackson:
     default-property-inclusion: non_null
 
@@ -91,11 +93,27 @@ knife4j:
   setting:
     language: zh_cn
 
-mybatis:
+mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.oj.entity
   configuration:
     map-underscore-to-camel-case: true
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  metrics:
+    tags:
+      application: oj-judge-service
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
 
 logging:
   level:
@@ -104,8 +122,8 @@ logging:
         mapper: debug
         service: info
         controller: info
-#    dev.langchain4j: DEBUG
-#    com.oj.service.agent: DEBUG
+    dev.langchain4j: DEBUG
+    com.oj.service.agent: DEBUG
 
 sky:
   jwt:

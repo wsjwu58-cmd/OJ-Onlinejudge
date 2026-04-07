@@ -1,0 +1,234 @@
+{
+  "info": {
+    "name": "OJ判题链路性能测试",
+    "description": "判题链路各环节性能测试用例",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. 单次提交性能测试",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('响应成功', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('提交Token:', jsonData.data.submitToken);",
+              "console.log('状态:', jsonData.data.status);",
+              "",
+              "pm.test('返回Pending状态', function() {",
+              "    pm.expect(jsonData.data.status).to.eql('Pending');",
+              "});",
+              "",
+              "pm.test('响应时间 < 500ms', function() {",
+              "    pm.expect(pm.response.responseTime).to.below(500);",
+              "});",
+              "",
+              "pm.collectionVariables.set('submissionToken', jsonData.data.submitToken);",
+              "pm.collectionVariables.set('problemId', jsonData.data.problemId);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"problemId\": 1,\n  \"language\": \"Java\",\n  \"code\": \"public class Solution { public static void main(String[] args) { System.out.println(\\\"Hello World\\\"); } }\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/judge/submit",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "judge", "submit"]
+        }
+      }
+    },
+    {
+      "name": "2. 批量提交性能测试（10次并发）",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('所有请求成功', function() {",
+              "    pm.expect(responseCode.code).to.eql(200);",
+              "});",
+              "",
+              "console.log('响应时间:', pm.response.responseTime + 'ms');",
+              "",
+              "pm.test('响应时间 < 1000ms', function() {",
+              "    pm.expect(pm.response.responseTime).to.below(1000);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "{{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"problemId\": 1,\n  \"language\": \"Python\",\n  \"code\": \"print('Hello World')\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/judge/submit",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "judge", "submit"]
+        }
+      }
+    },
+    {
+      "name": "3. 运行代码性能测试",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('响应成功', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "console.log('响应时间:', pm.response.responseTime + 'ms');",
+              "",
+              "pm.test('响应时间 < 2000ms', function() {",
+              "    pm.expect(pm.response.responseTime).to.below(2000);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"problemId\": 1,\n  \"language\": \"Java\",\n  \"customInput\": \"test input\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/user/judge/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "judge", "run"]
+        }
+      }
+    },
+    {
+      "name": "4. 查询提交历史性能测试",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('响应成功', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "var jsonData = pm.response.json();",
+              "console.log('提交记录数:', jsonData.data ? jsonData.data.length : 0);",
+              "console.log('响应时间:', pm.response.responseTime + 'ms');",
+              "",
+              "pm.test('响应时间 < 200ms', function() {",
+              "    pm.expect(pm.response.responseTime).to.below(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "{{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/user/submission/list?problemId={{problemId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["user", "submission", "list"],
+          "query": [
+            {
+              "key": "problemId",
+              "value": "{{problemId}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. 统计接口性能测试",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('响应成功', function() {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "console.log('响应时间:', pm.response.responseTime + 'ms');",
+              "",
+              "pm.test('响应时间 < 300ms', function() {",
+              "    pm.expect(pm.response.responseTime).to.below(300);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/submission/count",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "submission", "count"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": "your-jwt-token"
+    },
+    {
+      "key": "submissionToken",
+      "value": ""
+    },
+    {
+      "key": "problemId",
+      "value": "1"
+    }
+  ]
+}

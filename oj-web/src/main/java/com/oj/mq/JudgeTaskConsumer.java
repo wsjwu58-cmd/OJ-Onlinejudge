@@ -2,6 +2,7 @@ package com.oj.mq;
 
 import com.alibaba.fastjson.JSONObject;
 import com.oj.config.Judge0Client;
+import com.oj.config.JudgeMetrics;
 import com.oj.constant.MqConstant;
 import com.oj.dto.DatabaseUpdateMessage;
 import com.oj.dto.JudgeTaskMessage;
@@ -57,20 +58,26 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
     @Autowired
     private Executor judgeExecutor;
 
+    @Autowired
+    private JudgeMetrics judgeMetrics;
+
     @Override
     public void onMessage(JudgeTaskMessage msg) {
+        long totalStart = System.currentTimeMillis();
+
         log.info("收到判题任务: submissionToken={}, problemId={}, userId={}",
                 msg.getSubmissionToken(), msg.getProblemId(), msg.getUserId());
 
-        // 1. 获取测试用例
+        long startTime = System.currentTimeMillis();
         List<TestCase> testCases = testCaseMapper.selectByProblemId(msg.getProblemId());
+        judgeMetrics.recordTestCaseQuery(System.currentTimeMillis() - startTime);
+
         if (testCases == null || testCases.isEmpty()) {
             log.error("题目 {} 没有测试用例，跳过", msg.getProblemId());
             sendDatabaseUpdate(msg, "Runtime Error", 0, 0, 0, 0, "该题目暂无测试用例", false);
             return;
         }
 
-        // 2. 并行执行所有测试用例
         List<CompletableFuture<TestCaseResult>> futures = new ArrayList<>();
         for (int i = 0; i < testCases.size(); i++) {
             final int index = i;
@@ -79,23 +86,22 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
                     runSingleTestCase(msg, tc, index), judgeExecutor));
         }
 
-        // 3. 等待所有测试用例完成
         CompletableFuture<Void> allFutures = CompletableFuture.allOf(
                 futures.toArray(new CompletableFuture[0]));
 
         TestCaseResult finalResult;
         try {
-            // 设置超时时间：单个用例超时 * 总用例数 + 缓冲
             int timeoutSec = msg.getTimeLimitSec() != null ? msg.getTimeLimitSec().intValue() : 10;
             int totalTimeout = timeoutSec * testCases.size() + 30;
-            allFutures.get(totalTimeout, java.util.concurrent.TimeUnit.SECONDS);
 
-            // 收集所有结果
+            long judge0Start = System.currentTimeMillis();
+            allFutures.get(totalTimeout, java.util.concurrent.TimeUnit.SECONDS);
+            judgeMetrics.recordJudge0Call(System.currentTimeMillis() - judge0Start);
+
             List<TestCaseResult> results = futures.stream()
                     .map(CompletableFuture::join)
                     .collect(Collectors.toList());
 
-            // 4. 汇总结果
             finalResult = aggregateResults(results);
 
         } catch (java.util.concurrent.TimeoutException e) {
@@ -118,8 +124,6 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
             finalResult.setTotal(testCases.size());
         }
 
-        // 5. 执行 Lua 脚本：update_result_v2（原子性更新 Redis）
-        // 比赛模式下 key 加 contest 前缀，与普通练习隔离
         String prefix = msg.getContestId() != null ? "contest:" + msg.getContestId() + ":" : "";
         String userStatusKey = prefix + "user:" + msg.getUserId() + ":problem:" + msg.getProblemId() + ":status";
         String solvedCountKey = prefix + "problem:" + msg.getProblemId() + ":solved_count";
@@ -137,6 +141,7 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
                 lastResultKey
         );
 
+        startTime = System.currentTimeMillis();
         List<Object> luaResult = stringRedisTemplate.execute(
                 updateResultScript,
                 keys,
@@ -145,10 +150,10 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
                 String.valueOf(finalResult.getMaxRuntime()),
                 String.valueOf(finalResult.getMaxMemory())
         );
+        judgeMetrics.recordRedisUpdate(System.currentTimeMillis() - startTime);
 
         log.info("Lua update_result_v2 结果: {}, finalStatus={}", luaResult, finalResult.getStatus());
 
-        // 6. 解析 Lua 返回值
         if (luaResult == null || luaResult.size() < 2) {
             log.error("Lua脚本返回值异常: {}", luaResult);
             return;
@@ -157,22 +162,18 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
         int isFirstAC = Integer.parseInt(luaResult.get(0).toString());
         String resultStatus = luaResult.get(1).toString();
 
-        // token不存在
         if ("token_not_found".equals(resultStatus)) {
             log.warn("Token不存在: {}", msg.getSubmissionToken());
             return;
         }
 
-        // token已处理过
         if ("already_processed".equals(resultStatus)) {
             log.info("Token已处理: {}", msg.getSubmissionToken());
             return;
         }
 
-        // 判断是否首次AC
         boolean firstAc = (isFirstAC == 1 && "first_ac".equals(resultStatus));
 
-        // 记录统计数据（用于日志）
         if (luaResult.size() >= 4) {
             int newProblemCount = Integer.parseInt(luaResult.get(2).toString());
             int newUserCount = Integer.parseInt(luaResult.get(3).toString());
@@ -182,9 +183,10 @@ public class JudgeTaskConsumer implements RocketMQListener<JudgeTaskMessage> {
             }
         }
 
-        // 7. 发送到数据库更新队列
         sendDatabaseUpdate(msg, finalResult.getStatus(), finalResult.getPassed(), finalResult.getTotal(),
                 finalResult.getMaxRuntime(), finalResult.getMaxMemory(), finalResult.getErrorInfo(), firstAc);
+
+        judgeMetrics.recordJudgeTotal(System.currentTimeMillis() - totalStart);
 
         log.info("判题完成: submissionToken={}, status={}, passed={}/{}, firstAc={}",
                 msg.getSubmissionToken(), finalResult.getStatus(),

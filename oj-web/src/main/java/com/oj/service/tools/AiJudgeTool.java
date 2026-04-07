@@ -1,5 +1,6 @@
 package com.oj.service.tools;
 
+import com.oj.exception.ParameterMissingException;
 import com.oj.entity.Problem;
 import com.oj.entity.TestCase;
 import com.oj.mapper.ProblemMapper;
@@ -30,6 +31,9 @@ public class AiJudgeTool {
             @P("用户提交的代码") String code,
             @P("编程语言") String language) {
         log.info("Tool调用: analyzeCodeCorrectness, problemId={}, language={}", problemId, language);
+        if (problemId == null) {
+            throw new ParameterMissingException("problemId");
+        }
         try {
             Problem problem = problemMapper.selectById(problemId);
             if (problem == null) {
@@ -48,13 +52,16 @@ public class AiJudgeTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("分析代码正确性失败", e);
-            return "分析代码正确性失败: " + e.getMessage();
+            throw new RuntimeException("分析代码正确性失败: " + e.getMessage(), e);
         }
     }
 
     @Tool("获取题目的测试用例用于验证代码")
     public String getTestCasesForJudge(@P("题目ID") Integer problemId) {
         log.info("Tool调用: getTestCasesForJudge, problemId={}", problemId);
+        if (problemId == null) {
+            throw new ParameterMissingException("problemId");
+        }
         try {
             List<TestCase> testCases = testCaseMapper.selectByProblemId(problemId);
             if (testCases == null || testCases.isEmpty()) {
@@ -76,7 +83,7 @@ public class AiJudgeTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("获取测试用例失败", e);
-            return "获取测试用例失败: " + e.getMessage();
+            throw new RuntimeException("获取测试用例失败: " + e.getMessage(), e);
         }
     }
 
@@ -126,6 +133,9 @@ public class AiJudgeTool {
             @P("代码内容") String code,
             @P("编程语言") String language) {
         log.info("Tool调用: suggestImprovements, problemId={}, language={}", problemId, language);
+        if (problemId == null) {
+            throw new ParameterMissingException("problemId");
+        }
         try {
             Problem problem = problemMapper.selectById(problemId);
             StringBuilder sb = new StringBuilder();
@@ -146,7 +156,7 @@ public class AiJudgeTool {
             return sb.toString();
         } catch (Exception e) {
             log.error("获取改进建议失败", e);
-            return "获取改进建议失败: " + e.getMessage();
+            throw new RuntimeException("获取改进建议失败: " + e.getMessage(), e);
         }
     }
 }
