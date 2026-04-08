@@ -8,15 +8,17 @@ import com.oj.service.tools.AiJudgeTool;
 import com.oj.service.tools.KnowledgeRetrievalTool;
 import com.oj.service.tools.LearningAnalyzerTool;
 import com.oj.service.tools.SolutionGeneratorTool;
-import com.oj.service.tools.WebSearchMcpTool;
+
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.chat.StreamingChatLanguageModel;
 import dev.langchain4j.service.AiServices;
+import dev.langchain4j.service.tool.ToolProvider;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -40,7 +42,8 @@ public class AgentService {
     private final KnowledgeRetrievalTool knowledgeRetrievalTool;
     private final RedisChatMemoryStore redisChatMemoryStore;
     private final LongTermMemoryService longTermMemoryService;
-    private final WebSearchMcpTool webSearchMcpTool;
+    private ToolProvider mcpToolProvider;
+
 
     private AgentAssistant agentAssistant;
 
@@ -53,8 +56,8 @@ public class AgentService {
             AiJudgeTool aiJudgeTool,
             KnowledgeRetrievalTool knowledgeRetrievalTool,
             RedisChatMemoryStore redisChatMemoryStore,
-            LongTermMemoryService longTermMemoryService,
-            WebSearchMcpTool webSearchMcpTool) {
+            LongTermMemoryService longTermMemoryService
+            ) {
         this.chatLanguageModel = chatLanguageModel;
         this.streamingChatLanguageModel = streamingChatLanguageModel;
         this.solutionGeneratorTool = solutionGeneratorTool;
@@ -63,22 +66,44 @@ public class AgentService {
         this.knowledgeRetrievalTool = knowledgeRetrievalTool;
         this.redisChatMemoryStore = redisChatMemoryStore;
         this.longTermMemoryService = longTermMemoryService;
-        this.webSearchMcpTool = webSearchMcpTool;
+    }
+
+    @Autowired(required = false)
+    @Qualifier("mcpToolProvider")
+    public void setMcpToolProvider(ToolProvider mcpToolProvider) {
+        this.mcpToolProvider = mcpToolProvider;
     }
 
     @PostConstruct
     public void init() {
-        this.agentAssistant = AiServices.builder(AgentAssistant.class)
-                .chatLanguageModel(chatLanguageModel)
-                .streamingChatLanguageModel(streamingChatLanguageModel)
-                .tools(solutionGeneratorTool, learningAnalyzerTool, aiJudgeTool, knowledgeRetrievalTool, webSearchMcpTool)
-                .chatMemoryProvider(memoryId -> MessageWindowChatMemory.builder()
-                        .id(memoryId)
-                        .maxMessages(20)
-                        .chatMemoryStore(redisChatMemoryStore)
-                        .build())
-                .build();
-        log.info("AgentService initialized with Redis-backed chat memory, long-term memory service and Web Search MCP tool");
+        if (mcpToolProvider != null) {
+            this.agentAssistant = AiServices.builder(AgentAssistant.class)
+                    .chatLanguageModel(chatLanguageModel)
+                    .streamingChatLanguageModel(streamingChatLanguageModel)
+                    .tools(solutionGeneratorTool, learningAnalyzerTool, aiJudgeTool, knowledgeRetrievalTool)
+                    .chatMemoryProvider(memoryId -> MessageWindowChatMemory.builder()
+                            .id(memoryId)
+                            .maxMessages(20)
+                            .chatMemoryStore(redisChatMemoryStore)
+                            .build())
+                    .toolProvider(mcpToolProvider)
+                    .build();
+            log.info("AgentService initialized with MCP ToolProvider");
+        }
+//        } else {
+//            this.agentAssistant = AiServices.builder(AgentAssistant.class)
+//                    .chatLanguageModel(chatLanguageModel)
+//                    .streamingChatLanguageModel(streamingChatLanguageModel)
+//                    .tools(solutionGeneratorTool, learningAnalyzerTool, aiJudgeTool, knowledgeRetrievalTool)
+//                    .chatMemoryProvider(memoryId -> MessageWindowChatMemory.builder()
+//                            .id(memoryId)
+//                            .maxMessages(20)
+//                            .chatMemoryStore(redisChatMemoryStore)
+//                            .build())
+//                    .build();
+//            log.info("AgentService initialized without MCP ToolProvider");
+//        }
+        log.info("AgentService initialized with Redis-backed chat memory, long-term memory service");
     }
 
     public String chat(String sessionId, String message) {
@@ -104,7 +129,7 @@ public class AgentService {
     }
 
     public String processAgentRequest(AgentRequestDTO request) {
-        log.info("Process agent request - task: {}, userId: {}, problemId: {}", 
+        log.info("Process agent request - task: {}, userId: {}, problemId: {}",
                 request.getTask(), request.getUserId(), request.getProblemId());
         String sessionId = resolveSessionId(request);
         try {
@@ -124,7 +149,7 @@ public class AgentService {
     }
 
     public Flux<String> processAgentRequestStream(AgentRequestDTO request) {
-        log.info("Process agent request stream - task: {}, userId: {}, problemId: {}", 
+        log.info("Process agent request stream - task: {}, userId: {}, problemId: {}",
                 request.getTask(), request.getUserId(), request.getProblemId());
         String sessionId = resolveSessionId(request);
         try {
@@ -195,8 +220,8 @@ public class AgentService {
         // 只有在“看题解/解题思路/参考代码”等场景才需要题目ID
         boolean likelyNeedsProblemId =
                 task.contains("题解") || task.contains("解题") || task.contains("思路") ||
-                task.contains("参考代码") || task.contains("题目") || task.contains("写代码") ||
-                task.contains("第");
+                        task.contains("参考代码") || task.contains("题目") || task.contains("写代码") ||
+                        task.contains("第");
         if (!likelyNeedsProblemId) return;
 
         Integer problemId = resolveProblemIdFromRequest(request, combined);

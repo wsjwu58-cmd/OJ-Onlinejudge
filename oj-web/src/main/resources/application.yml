@@ -11,7 +11,7 @@ server:
 
 spring:
   profiles:
-    active: local
+    active: dev
   main:
     allow-circular-references: true
   datasource:

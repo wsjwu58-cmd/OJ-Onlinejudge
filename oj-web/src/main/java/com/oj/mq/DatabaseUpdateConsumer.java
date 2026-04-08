@@ -1,6 +1,7 @@
 package com.oj.mq;
 
 import com.alibaba.fastjson.JSONObject;
+import com.oj.config.JudgeMetrics;
 import com.oj.constant.MqConstant;
 import com.oj.constant.MessageConstant;
 import com.oj.dto.DatabaseUpdateMessage;
@@ -61,13 +62,16 @@ public class DatabaseUpdateConsumer implements RocketMQListener<DatabaseUpdateMe
     @Autowired
     private ContestProblemMapper contestProblemMapper;
 
+    @Autowired
+    private JudgeMetrics judgeMetrics;
+
     @Override
     public void onMessage(DatabaseUpdateMessage msg) {
         log.info("收到数据库更新消息: userId={}, problemId={}, status={}, firstAc={}, contestId={}",
                 msg.getUserId(), msg.getProblemId(), msg.getStatus(), msg.isFirstAc(), msg.getContestId());
 
         try {
-            // 1. 保存提交记录（含 contestId）
+            long startTime = System.currentTimeMillis();
             Submission submission = new Submission();
             submission.setUserId(msg.getUserId());
             submission.setProblemId(msg.getProblemId());
@@ -82,25 +86,23 @@ public class DatabaseUpdateConsumer implements RocketMQListener<DatabaseUpdateMe
             submission.setErrorInfo(msg.getErrorInfo());
             submission.setSubmitTime(msg.getSubmitTime());
             subMissionMapper.insert(submission);
+            judgeMetrics.recordDatabaseUpdate(System.currentTimeMillis() - startTime);
 
             log.info("提交记录已保存: submissionId={}", submission.getId());
 
-            // 2. 如果首次 AC（普通练习维度），更新用户解题数
             if (msg.isFirstAc()) {
                 updateUserSolvedCount(msg.getUserId());
             }
 
-            // 3. 更新题目通过率
             updateAcceptance(msg.getProblemId());
 
-            // 4. ★ 如果是比赛提交且 Accepted，更新 Redis 排行榜
             if (msg.getContestId() != null && "Accepted".equals(msg.getStatus())) {
                 int problemScore = getProblemScoreInContest(msg.getContestId(), msg.getProblemId());
                 userContestService.updateRankOnAccepted(
                         msg.getContestId(), msg.getUserId(), msg.getProblemId(), problemScore);
             }
 
-            // 5. WebSocket 通知前端（推送判题结果）
+            startTime = System.currentTimeMillis();
             Map<String, Object> wsMessage = new HashMap<>();
             wsMessage.put("type", "judge_result");
             wsMessage.put("userId", msg.getUserId());
@@ -116,6 +118,8 @@ public class DatabaseUpdateConsumer implements RocketMQListener<DatabaseUpdateMe
             wsMessage.put("content", "判题完成 - " + msg.getStatus());
 
             webSocketServer.sendToAllClient(JSONObject.toJSONString(wsMessage));
+            judgeMetrics.recordWebsocketPush(System.currentTimeMillis() - startTime);
+
             log.info("WebSocket 通知已发送: submissionId={}, status={}", submission.getId(), msg.getStatus());
 
         } catch (Exception e) {
