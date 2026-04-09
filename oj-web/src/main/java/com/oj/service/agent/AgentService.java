@@ -1,5 +1,6 @@
 package com.oj.service.agent;
 
+import com.oj.config.McpClientConfiguration;
 import com.oj.dto.AgentRequestDTO;
 import com.oj.exception.ParameterMissingException;
 import com.oj.service.agent.memory.LongTermMemoryService;
@@ -43,7 +44,7 @@ public class AgentService {
     private final RedisChatMemoryStore redisChatMemoryStore;
     private final LongTermMemoryService longTermMemoryService;
     private ToolProvider mcpToolProvider;
-
+    private McpClientConfiguration mcpClientConfiguration;
 
     private AgentAssistant agentAssistant;
 
@@ -56,7 +57,8 @@ public class AgentService {
             AiJudgeTool aiJudgeTool,
             KnowledgeRetrievalTool knowledgeRetrievalTool,
             RedisChatMemoryStore redisChatMemoryStore,
-            LongTermMemoryService longTermMemoryService
+            LongTermMemoryService longTermMemoryService,
+            McpClientConfiguration mcpClientConfiguration
             ) {
         this.chatLanguageModel = chatLanguageModel;
         this.streamingChatLanguageModel = streamingChatLanguageModel;
@@ -66,6 +68,8 @@ public class AgentService {
         this.knowledgeRetrievalTool = knowledgeRetrievalTool;
         this.redisChatMemoryStore = redisChatMemoryStore;
         this.longTermMemoryService = longTermMemoryService;
+
+        this.mcpClientConfiguration=mcpClientConfiguration;
     }
 
     @Autowired(required = false)

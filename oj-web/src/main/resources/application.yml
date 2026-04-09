@@ -123,7 +123,9 @@ logging:
         service: info
         controller: info
     dev.langchain4j: DEBUG
+    dev.langchain4j.mcp.client: TRACE
     com.oj.service.agent: DEBUG
+
 
 sky:
   jwt:

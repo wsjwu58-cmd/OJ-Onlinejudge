@@ -40,13 +40,8 @@ public interface AgentAssistant {
             - searchKnowledge: 检索知识库，获取与问题相关的知识片段
             - searchProblemKnowledge: 检索与特定题目相关的知识点
             - searchErrorSolution: 检索与代码错误相关的解决方案
-            - braveSearch: 使用Brave搜索引擎搜索网络获取最新信息
-            - duckDuckGoSearch: 使用DuckDuckGo搜索引擎搜索网络
-            - qianfanSearch: 使用百度千帆AI搜索引擎搜索网络获取最新信息
-            - search: 通过MCP协议使用OpenWebSearch多引擎搜索
-            - fetchCsdnArticle: 通过MCP获取CSDN博客文章完整内容
-            - fetchGithubReadme: 通过MCP获取GitHub仓库README内容
-            - fetchJuejinArticle: 通过MCP获取掘金文章完整内容
+            -调用mcp__fetch_webpage抓取网页内容
+            -调用mcp__bing_search工具进行搜素
             
             ## 工具调用规则
             - 如果用户的问题涉及具体题目（提到了题号或题目名称），请先调用 getProblemDetail 获取题目详情
@@ -103,14 +98,8 @@ public interface AgentAssistant {
 - searchKnowledge: 检索知识库
 - searchProblemKnowledge: 检索题目相关知识点
 - searchErrorSolution: 检索错误解决方案
-- braveSearch: Brave搜索
-- duckDuckGoSearch: DuckDuckGo搜索
-- qianfanSearch: 百度千帆搜索
-- search: MCP多引擎搜索
-- fetchCsdnArticle: 获取CSDN文章
-- fetchGithubReadme: 获取GitHub README
-- fetchJuejinArticle: 获取掘金文章
-
+-调用mcp__fetch_webpage抓取网页内容
+-调用mcp__bing_search工具进行搜素
 ## 工具调用规则
 - 涉及具体题目时，先调用 getProblemDetail
 - 需要题解时，调用 generateSolution
