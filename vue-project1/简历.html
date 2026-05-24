@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人简历</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        h2 {
+            font-size: 18px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        
+        h3 {
+            font-size: 16px;
+            margin-top: 15px;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+        
+        li {
+            margin-bottom: 5px;
+        }
+        
+        .info-section {
+            margin-bottom: 20px;
+        }
+        
+        .info-item {
+            margin-bottom: 5px;
+        }
+        
+        .project-section {
+            margin-bottom: 20px;
+        }
+        
+        .highlight {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>个人简历</h1>
+    
+    <div class="info-section">
+        <h2>基本信息</h2>
+        <ul>
+            <li><span class="highlight">姓名</span>：[姓名]</li>
+            <li><span class="highlight">专业</span>：软件工程</li>
+            <li><span class="highlight">学校</span>：中北大学</li>
+            <li><span class="highlight">年级</span>：大二</li>
+            <li><span class="highlight">英语水平</span>：英语四级</li>
+            <li><span class="highlight">联系方式</span>：[手机号] | [邮箱]</li>
+        </ul>
+    </div>
+    
+    <div class="info-section">
+        <h2>教育背景</h2>
+        <h3>中北大学</h3>
+        <p><span class="highlight">软件工程专业</span> | 2022.09 - 2026.06</p>
+        <ul>
+            <li>核心课程：数据结构、算法分析与设计、操作系统、计算机网络、数据库原理、Java程序设计</li>
+            <li>英语四级已通过</li>
+        </ul>
+    </div>
+    
+    <div class="info-section">
+        <h2>技能</h2>
+        <ul>
+            <li><span class="highlight">后端开发</span>：Java 17、Spring Boot 3.3.6、MyBatis Plus 3.5.7、MySQL 8.0+、Redis 7.0+、RocketMQ 2.3.1</li>
+            <li><span class="highlight">前端开发</span>：Vue 3.2.38、Vue Router 4.6.4、Element Plus 2.13.1、Axios 1.13.2</li>
+            <li><span class="highlight">工具与技术</span>：Git、JWT、WebSocket、Judge0判题引擎、Spring AI、RAG知识库</li>
+            <li><span class="highlight">其他</span>：SQL注入防护、XSS防护、BCrypt密码加密</li>
+        </ul>
+    </div>
+    
+    <div class="project-section">
+        <h2>项目经历</h2>
+        <h3>OJ在线判题系统</h3>
+        <p><span class="highlight">项目简介</span>：一个功能完善的在线判题系统，采用前后端分离架构，支持代码提交、自动判题、AI辅助判题、竞赛管理、题组管理等功能。系统集成了先进的AI技术，实现了AI判题、错误分析、智能提示等创新功能。</p>
+        
+        <p><span class="highlight">技术栈</span>：</p>
+        <ul>
+            <li>后端：Spring Boot 3.3.6、Java 17、MyBatis Plus、MySQL、Redis、RocketMQ、Spring AI、WebSocket</li>
+            <li>前端：Vue 3、Vue Router、Element Plus、Monaco Editor、Axios</li>
+            <li>其他：Judge0判题引擎、JWT认证、Redis Lua限流</li>
+        </ul>
+        
+        <p><span class="highlight">核心亮点</span>：</p>
+        <ul>
+            <li>AI深度集成：实现AI判题、错误分析、智能提示和RAG知识库</li>
+            <li>实时判题系统：WebSocket实时推送判题结果，SSE流式响应</li>
+            <li>高并发设计：Redis Lua脚本限流，消息队列异步处理，防重复提交机制</li>
+            <li>完善的用户体系：角色权限管理、积分系统、Rating系统、签到系统</li>
+            <li>多题型支持：算法题、数据库题等多种题型</li>
+        </ul>
+    </div>
+    
+    <div class="info-section">
+        <h2>自我评价</h2>
+        <ul>
+            <li>具备扎实的Java后端开发基础，熟悉Spring Boot生态</li>
+            <li>了解前后端分离开发模式，具备全栈开发能力</li>
+            <li>对AI技术在编程教育领域的应用有浓厚兴趣</li>
+            <li>学习能力强，能够快速掌握新技术</li>
+            <li>具备良好的团队协作能力和沟通能力</li>
+        </ul>
+    </div>
+</body>
+</html>

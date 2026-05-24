@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.contest.mapper.ContestMapper">
+    <!-- 微服务：不再JOIN user表，createdName通过Feign调用UserClient填充 -->
+    <select id="selectPage" resultType="com.oj.contest.vo.ContestVO">
+        select c.* from contests c ${ew.customSqlSegment}
+    </select>
+
+    <select id="CountContest" resultType="java.lang.Integer">
+        select count(id) from contests
+        <where>
+            <if test="status!=null">
+                and status=#{status}
+            </if>
+        </where>
+    </select>
+</mapper>

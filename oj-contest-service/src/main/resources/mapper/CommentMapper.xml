@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.oj.contest.mapper.CommentMapper">
+    <!-- 微服务：不再JOIN user表，username和replyToUsername通过Feign调用UserClient填充 -->
+    <select id="selectByIdsOrdered" resultType="com.oj.contest.vo.SolutionVO">
+        SELECT sc.*
+        FROM solution_comment sc
+        WHERE sc.id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY FIELD(sc.id,
+        <foreach collection="ids" item="id" separator=",">
+            #{id}
+        </foreach>
+        )
+    </select>
+</mapper>

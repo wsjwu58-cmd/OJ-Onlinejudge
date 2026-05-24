@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: oj-judge-service
+  cloud:
+    nacos:
+      username: nacos
+      password: nacos
+      discovery:
+        server-addr: 192.168.141.129:8848
+      config:
+        server-addr: 192.168.141.129:8848
+        file-extension: yml
+        shared-configs:
+          - data-id: oj-common-dev.yml
+            refresh: true

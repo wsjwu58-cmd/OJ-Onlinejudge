@@ -1,0 +1,101 @@
+spring:
+  cloud:
+    gateway:
+      # 全局过滤器：去掉 /api 前缀
+      default-filters:
+        - RewritePath=/api/(?<segment>.*), /$\{segment}
+
+      # 跨域配置
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowed-origin-patterns: "*"
+            allowed-methods: "*"
+            allowed-headers: "*"
+            allow-credentials: true
+
+      # 路由规则
+      routes:
+        # ===== 用户服务 =====
+        - id: user-admin
+          uri: lb://oj-user-service
+          predicates:
+            - Path=/api/admin/user/**,/api/admin/common/**
+        - id: user-user
+          uri: lb://oj-user-service
+          predicates:
+            - Path=/api/user/userLogin/**,/api/user/userInfo/**
+
+        # ===== 题目服务 =====
+        - id: problem-admin
+          uri: lb://oj-problem-service
+          predicates:
+            - Path=/api/admin/problem/**,/api/admin/problemTypes/**,/api/admin/test/**,/api/admin/knowledge/**
+        - id: problem-user
+          uri: lb://oj-problem-service
+          predicates:
+            - Path=/api/user/problem/**
+
+        # ===== 竞赛服务 =====
+        - id: contest-admin
+          uri: lb://oj-contest-service
+          predicates:
+            - Path=/api/admin/Contest/**,/api/admin/workSpace/**,/api/admin/report/**
+        - id: contest-user
+          uri: lb://oj-contest-service
+          predicates:
+            - Path=/api/user/contest/**,/api/user/comment/**
+
+        # ===== 题单服务（路由到problem-service） =====
+        - id: group-admin
+          uri: lb://oj-problem-service
+          predicates:
+            - Path=/api/admin/group/**
+        - id: group-user
+          uri: lb://oj-problem-service
+          predicates:
+            - Path=/api/user/group/**
+
+        # ===== 判题服务 =====
+        - id: judge-admin
+          uri: lb://oj-judge-service
+          predicates:
+            - Path=/api/admin/submission/**,/api/admin/malicious/**
+        - id: judge-user
+          uri: lb://oj-judge-service
+          predicates:
+            - Path=/api/user/judge/**,/api/user/submission/**
+
+        # ===== AI服务 =====
+        - id: ai-user
+          uri: lb://oj-ai-service
+          predicates:
+            - Path=/api/user/ai/**,/api/user/agent/**,/api/user/ai-test/**
+
+        # ===== WebSocket =====
+        - id: judge-websocket
+          uri: lb:ws://oj-judge-service
+          predicates:
+            - Path=/ws/**
+
+  # Redis配置（用于用户端Token校验）
+  data:
+    redis:
+      host: 192.168.141.128
+      port: 6378
+      password: qwer1234
+      database: 0
+
+# JWT配置
+sky:
+  jwt:
+    admin-secret-key: itcast-sky-take-out-admin-secret-key-2024
+    admin-ttl: 7200000
+    admin-token-name: token
+    user-secret-key: itheima-sky-take-out-user-secret-key-2024
+    user-ttl: 7200000
+    user-token-name: authentication
+
+logging:
+  level:
+    com.oj.gateway: debug

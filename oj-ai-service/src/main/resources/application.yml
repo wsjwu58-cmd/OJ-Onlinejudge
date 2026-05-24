@@ -1,0 +1,108 @@
+server:
+  port: 8086
+
+spring:
+  data:
+    redis:
+      host: 192.168.141.128
+      port: 6378
+      password: qwer1234
+      database: 0
+      client-type: jedis
+      jedis:
+        pool:
+          max-active: 200
+          max-idle: 100
+          min-idle: 50
+          max-wait: 3000
+          time-between-eviction-runs: 10s
+      timeout: 5000ms
+  jackson:
+    default-property-inclusion: non_null
+
+# LangChain4j - AI模型配置 (SiliconFlow)
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen3-Coder-30B-A3B-Instruct
+      temperature: 0.7
+      max-tokens: 4096
+      log-requests: true
+      log-responses: true
+    streaming-chat-model:
+      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      base-url: https://api.siliconflow.cn/v1
+      model-name: Qwen/Qwen3-Coder-30B-A3B-Instruct
+      temperature: 0.7
+      log-requests: true
+      log-responses: true
+    embedding-model:
+      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      base-url: https://api.siliconflow.cn/v1
+      model-name: BAAI/bge-large-zh-v1.5
+      log-requests: true
+      log-responses: true
+  http:
+    client-builder-factory: dev.langchain4j.http.client.spring.restclient.SpringRestClientBuilderFactory
+
+# Knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  default-flat-param-object: true
+  group-configs:
+    - group: ai-service
+      paths-to-match: /**
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  metrics:
+    tags:
+      application: oj-ai-service
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+
+logging:
+  level:
+    com:
+      oj:
+        mapper: debug
+        service: info
+        controller: info
+    dev.langchain4j: DEBUG
+    dev.langchain4j.mcp.client: TRACE
+    com.oj.service.agent: DEBUG
+
+# 知识库配置
+knowledge:
+  auto-import:
+    enabled: false
+    path: ./knowledge/pdfs/
+
+# Agent配置
+oj:
+  agent:
+    use-langgraph4j: true
+  mcp:
+    brave-search:
+      enabled: false
