@@ -629,8 +629,7 @@ const handleSubmitCode = async ({ problemId, code, language }) => {
       editorResult.value = {
         status: 'Processing',
         message: data.errorInfo || '有提交正在判题中，请等待判题完成后再提交',
-        statusType: 'processing',
-        submitToken: data.submitToken
+        statusType: 'processing'
       }
       ElMessage.info(data.errorInfo || '有提交正在判题中，请等待判题完成后再提交')
       return
@@ -644,12 +643,13 @@ const handleSubmitCode = async ({ problemId, code, language }) => {
         message: data.errorInfo || '代码已提交，正在排队判题中...',
         statusType: 'judging'
       }
+      const submitTime = Date.now()
 
       // 启动轮询降级：如果 WebSocket 未在超时内推送结果，通过轮询提交列表获取
       judgePoller = createSubmissionPoller(problemId, {
         interval: 2500,
         timeout: 120000,
-        submitToken: data.submitToken,  // 精确匹配本次提交，防止拿到旧的 AI Error 记录
+        since: submitTime,
         onResult: (result) => {
           // 只有当前还处于 Judging 状态时才更新（避免与 WebSocket 冲突）
           if (editorResult.value?.statusType === 'judging') {

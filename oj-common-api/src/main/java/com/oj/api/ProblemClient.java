@@ -1,5 +1,6 @@
 package com.oj.api;
 
+import com.oj.api.dto.HackAssetsDTO;
 import com.oj.api.dto.ProblemAcceptanceFeignDTO;
 import com.oj.api.dto.ProblemFeignDTO;
 import com.oj.api.dto.TestCaseFeignDTO;
@@ -35,4 +36,18 @@ public interface ProblemClient {
 
     @GetMapping("/internal/problem/acceptance-top10")
     Result<List<ProblemAcceptanceFeignDTO>> selectAcceptanceTop10();
+
+    @GetMapping("/internal/problem/{problemId}/hack-assets")
+    Result<HackAssetsDTO> getHackAssets(@PathVariable("problemId") Integer problemId);
+
+    @PostMapping("/internal/problem/test-case/hack")
+    Result<Void> addHackTestCase(@RequestParam("problemId") Integer problemId,
+                                  @RequestParam("sourceHackId") Long sourceHackId,
+                                  @RequestParam("inputData") String inputData,
+                                  @RequestParam("outputData") String outputData);
+
+    @PutMapping("/internal/problem/{problemId}/validator-hash")
+    Result<Void> updateValidatorHash(@PathVariable("problemId") Integer problemId,
+                                      @RequestParam("exePath") String exePath,
+                                      @RequestParam("srcHash") String srcHash);
 }

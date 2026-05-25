@@ -35,11 +35,52 @@ export const contestSubmitApi = ({ contestId, problemId, code, language }) => {
   })
 }
 
+// Hack: 查询AC和锁定状态
+export const getHackStatusApi = (contestId, problemId) => {
+  return request.get(`/user/contest/${contestId}/problem/${problemId}/hack-status`)
+}
+
+// Hack: 锁定题目
+export const lockProblemApi = (contestId, problemId) => {
+  return request.post(`/user/contest/${contestId}/problem/${problemId}/lock`)
+}
+
+// Hack: 解锁题目
+export const unlockProblemApi = (contestId, problemId) => {
+  return request.post(`/user/contest/${contestId}/problem/${problemId}/unlock`)
+}
+
+// Hack: 获取AC提交列表（含代码）
+export const getAcSubmissionsApi = (contestId, problemId) => {
+  return request.get(`/user/contest/${contestId}/problem/${problemId}/ac-submissions`)
+}
+
+// Hack: 提交Hack
+export const submitHackApi = (contestId, data) => {
+  return request.post(`/user/contest/${contestId}/hack`, data)
+}
+
+// Hack: 查询Hack结果
+export const getHackResultApi = (contestId, hackId) => {
+  return request.get(`/user/contest/${contestId}/hack/${hackId}/result`)
+}
+
+// Hack: 查询Hack记录列表
+export const getHackRecordsApi = (contestId) => {
+  return request.get(`/user/contest/${contestId}/hack/records`)
+}
+
 export default {
   getContestsApi,
   getContestDetailApi,
   joinContestApi,
   getContestProblemsApi,
   getContestRankApi,
-  contestSubmitApi
+  contestSubmitApi,
+  lockProblemApi,
+  unlockProblemApi,
+  getAcSubmissionsApi,
+  submitHackApi,
+  getHackResultApi,
+  getHackRecordsApi
 }

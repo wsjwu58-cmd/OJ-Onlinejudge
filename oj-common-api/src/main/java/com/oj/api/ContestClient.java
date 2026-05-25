@@ -20,4 +20,11 @@ public interface ContestClient {
 
     @GetMapping("/internal/contest/problem/count")
     Result<Long> countContestByProblemId(@RequestParam("problemId") Integer problemId);
+
+    @PostMapping("/internal/contest/rank/hack")
+    Result<Void> updateRankOnHackSuccess(@RequestParam("contestId") Integer contestId,
+                                          @RequestParam("hackerId") Long hackerId,
+                                          @RequestParam("targetUserId") Long targetUserId,
+                                          @RequestParam("problemId") Integer problemId,
+                                          @RequestParam("score") Integer score);
 }

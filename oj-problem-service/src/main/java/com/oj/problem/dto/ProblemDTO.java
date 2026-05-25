@@ -24,5 +24,12 @@ public class ProblemDTO {
 
     private String dbSchema;
     private String dbInitData;
+    private String validatorPath;
+    private String validatorExePath;
+    private String validatorSrcHash;
+    private String referencePath;
+    private String referenceLanguage;
+    private String validatorCode;
+    private String referenceCode;
     private List<ProblemType> typeList;
 }

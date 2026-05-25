@@ -31,6 +31,10 @@ public class ContestClientFallbackFactory implements FallbackFactory<ContestClie
             public Result<Long> countContestByProblemId(Integer problemId) {
                 return Result.error("竞赛服务调用失败: " + cause.getMessage());
             }
+            @Override
+            public Result<Void> updateRankOnHackSuccess(Integer contestId, Long hackerId, Long targetUserId, Integer problemId, Integer score) {
+                return Result.error("竞赛服务调用失败: " + cause.getMessage());
+            }
         };
     }
 }

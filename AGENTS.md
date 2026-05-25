@@ -1,19 +1,20 @@
 # OJ-Microservice 开发规范
 
 ## 项目概述
-在线判题系统从单体（oj-project/）向Spring Cloud微服务迁移改造。
+在线判题系统
 
 ## 目录结构
-- oj-project/ — 原单体项目（参考源，不可修改）
-- vue-project1/ — 用户端前端 (Vue3 + Element Plus + Vite)
-- vue-Element/ — 管理端前端 (Vue3 + Element Plus + Vite)
+两个前端
+
+用户端在vue-project1
+
+管理端在vue-Element中
+
 - oj-*/ — 微服务模块 (gateway / user / problem / contest / judge / ai)
 
 ## 核心原则
-1. 功能完全迁移：原项目所有功能完整迁移，不得遗漏
-2. 禁止新功能：不做任何原项目没有的功能添加
-3. 配置一致：端口、数据库、中间件地址等均与原项目保持一致
-4. 问题溯源：遇到错误优先查看 oj-project/ 中对应实现
+1. 根据文档进行功能实现
+2. 配置一致：端口、数据库、中间件地址等均与原项目保持一致
 
 ## 技术栈
 后端：Spring Boot 3.4.2 + Spring Cloud + Nacos + Sentinel + OpenFeign + MyBatis-Plus + RocketMQ + JWT + Redis
@@ -28,3 +29,11 @@
 - 前端 API 统一指向 Gateway，用户端 /api/user，管理端 /api/admin
 - 各服务配置由 Nacos 统一管理，本地仅保留 bootstrap.yml
 - 禁止引入 Lombok 以外的注解处理器
+
+## Hack 功能规范
+- 竞赛锁定：选手AC后POST /user/contest/{cid}/problem/{pid}/lock锁定，Redis标记`contest:lock:{cid}:{uid}:{pid}`，TTL=比赛结束
+- AC代码可见：锁定后可查同题其他AC提交的代码，统一用GET /ac-submissions接口
+- Hack判题：用ProcessBuilder编译运行C++ Validator校验数据合法性（exit 0=合法），再用Judge0并行运行目标代码+标准解答，目标失败且标准通过=HackSuccess
+- 排行更新：成功时Redis ZINCRBY hacker +score, hacked -score，扣减hacked用户的solved_count并清除AC标记，落地到hack_records表
+- 测试用例入库：Hack成功数据写入test_cases表，source_hack_id标记来源，后续所有提交均须通过
+- 通信：Hack任务/结果通过新增RocketMQ Topic异步传递；Feign定义在oj-common-api

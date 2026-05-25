@@ -1,10 +1,13 @@
 package com.oj.api.fallback;
 
 import com.oj.api.JudgeClient;
+import com.oj.api.dto.SubmissionFeignDTO;
 import com.oj.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.openfeign.FallbackFactory;
 import org.springframework.stereotype.Component;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -28,6 +31,14 @@ public class JudgeClientFallbackFactory implements FallbackFactory<JudgeClient> 
             }
             @Override
             public Result<Integer> countSubmissionsByDateAndStatus(String begin, String end, String status) {
+                return Result.error("判题服务调用失败: " + cause.getMessage());
+            }
+            @Override
+            public Result<String> getSubmissionCodeById(Long id) {
+                return Result.error("判题服务调用失败: " + cause.getMessage());
+            }
+            @Override
+            public Result<List<SubmissionFeignDTO>> getAcSubmissions(Integer contestId, Integer problemId) {
                 return Result.error("判题服务调用失败: " + cause.getMessage());
             }
         };

@@ -1,5 +1,6 @@
 package com.oj.problem.controller.internal;
 
+import com.oj.api.dto.HackAssetsDTO;
 import com.oj.api.dto.ProblemAcceptanceFeignDTO;
 import com.oj.api.dto.ProblemFeignDTO;
 import com.oj.api.dto.TestCaseFeignDTO;
@@ -113,5 +114,64 @@ public class ProblemInternalController {
             return dto;
         }).toList();
         return Result.success(dtoList);
+    }
+
+    @GetMapping("/{problemId}/hack-assets")
+    public Result<HackAssetsDTO> getHackAssets(@PathVariable Integer problemId) {
+        Problem problem = problemMapper.selectById(problemId);
+        if (problem == null) {
+            return Result.error("题目不存在");
+        }
+        HackAssetsDTO dto = new HackAssetsDTO();
+        dto.setValidatorPath(problem.getValidatorPath());
+        dto.setValidatorExePath(problem.getValidatorExePath());
+        dto.setValidatorSrcHash(problem.getValidatorSrcHash());
+        dto.setReferencePath(problem.getReferencePath());
+        dto.setReferenceLanguage(problem.getReferenceLanguage());
+        dto.setTimeLimitMs(problem.getTimeLimitMs());
+        dto.setMemoryLimitMb(problem.getMemoryLimitMb());
+        return Result.success(dto);
+    }
+
+    @PostMapping("/test-case/hack")
+    public Result<Void> addHackTestCase(@RequestParam Integer problemId,
+                                         @RequestParam Long sourceHackId,
+                                         @RequestParam String inputData,
+                                         @RequestParam String outputData) {
+        LambdaQueryWrapper<TestCase> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(TestCase::getProblemId, problemId)
+                .orderByDesc(TestCase::getOrderNum)
+                .last("LIMIT 1");
+        TestCase lastTc = testCaseMapper.selectOne(wrapper);
+        Short maxOrder = lastTc != null ? lastTc.getOrderNum() : 0;
+
+        TestCase tc = TestCase.builder()
+                .problemId(problemId)
+                .inputData(inputData)
+                .outputData(outputData)
+                .isSample(false)
+                .orderNum((short) (maxOrder + 1))
+                .sourceHackId(sourceHackId)
+                .scoreWeight(1.0)
+                .status(1)
+                .build();
+        testCaseMapper.insert(tc);
+        log.info("Hack测试用例已添加: problemId={}, hackId={}, testCaseId={}", problemId, sourceHackId, tc.getId());
+        return Result.success();
+    }
+
+    @PutMapping("/{problemId}/validator-hash")
+    public Result<Void> updateValidatorHash(@PathVariable Integer problemId,
+                                             @RequestParam String exePath,
+                                             @RequestParam String srcHash) {
+        Problem problem = problemMapper.selectById(problemId);
+        if (problem == null) {
+            return Result.error("题目不存在");
+        }
+        problem.setValidatorExePath(exePath);
+        problem.setValidatorSrcHash(srcHash);
+        problemMapper.updateById(problem);
+        log.info("Validator缓存已更新: problemId={}, exePath={}, hash={}", problemId, exePath, srcHash);
+        return Result.success();
     }
 }

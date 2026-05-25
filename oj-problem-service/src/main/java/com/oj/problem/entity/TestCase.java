@@ -28,6 +28,7 @@ public class TestCase implements Serializable {
     private Integer memoryLimitMb;
     private Double scoreWeight = 1.00;
     private Integer status = 1;
+    private Long sourceHackId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

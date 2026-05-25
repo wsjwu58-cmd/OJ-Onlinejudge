@@ -16,7 +16,8 @@ public interface SubmissionMapper extends BaseMapper<Submission> {
     default List<JudgeResultVO> selectSubmission(Long currentId, Long problemId) {
         LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Submission::getUserId, currentId)
-                .eq(problemId != null, Submission::getProblemId, problemId);
+                .eq(problemId != null, Submission::getProblemId, problemId)
+                .orderByDesc(Submission::getSubmitTime);
         List<Submission> submissions = selectList(wrapper);
         return submissions.stream().map(submission -> {
             JudgeResultVO vo = new JudgeResultVO();

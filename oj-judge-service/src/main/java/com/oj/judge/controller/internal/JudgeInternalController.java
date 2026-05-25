@@ -1,14 +1,17 @@
 package com.oj.judge.controller.internal;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.oj.api.dto.SubmissionFeignDTO;
 import com.oj.common.result.Result;
 import com.oj.judge.entity.Submission;
 import com.oj.judge.mapper.SubmissionMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -74,5 +77,34 @@ public class JudgeInternalController {
         if (status != null) params.put("status", status);
         Integer count = submissionMapper.countSubmission(params);
         return Result.success(count != null ? count : 0);
+    }
+
+    @GetMapping("/submission/{id}/code")
+    public Result<String> getSubmissionCodeById(@PathVariable Long id) {
+        log.info("内部调用-获取提交代码: id={}", id);
+        Submission submission = submissionMapper.selectById(id);
+        if (submission == null) {
+            return Result.error("提交记录不存在");
+        }
+        return Result.success(submission.getCode());
+    }
+
+    @GetMapping("/submission/ac-list")
+    public Result<List<SubmissionFeignDTO>> getAcSubmissions(
+            @RequestParam("contestId") Integer contestId,
+            @RequestParam("problemId") Integer problemId) {
+        log.info("内部调用-获取AC提交列表: contestId={}, problemId={}", contestId, problemId);
+        LambdaQueryWrapper<Submission> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Submission::getContestId, contestId)
+                .eq(Submission::getProblemId, problemId)
+                .eq(Submission::getStatus, "Accepted")
+                .orderByDesc(Submission::getSubmitTime);
+        List<Submission> submissions = submissionMapper.selectList(wrapper);
+        List<SubmissionFeignDTO> dtoList = submissions.stream().map(s -> {
+            SubmissionFeignDTO dto = new SubmissionFeignDTO();
+            BeanUtils.copyProperties(s, dto);
+            return dto;
+        }).toList();
+        return Result.success(dtoList);
     }
 }

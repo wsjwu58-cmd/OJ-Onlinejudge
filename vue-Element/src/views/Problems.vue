@@ -182,6 +182,34 @@
             placeholder="请输入C++代码模板"
           ></el-input>
         </el-form-item>
+
+        <el-divider content-position="left">Hack 配置</el-divider>
+
+        <el-form-item label="Validator">
+          <el-input
+            v-model="problemForm.validatorCode"
+            type="textarea"
+            :rows="8"
+            placeholder="C++ Validator 源码"
+          ></el-input>
+        </el-form-item>
+
+        <el-form-item label="标答语言">
+          <el-select v-model="problemForm.referenceLanguage" style="width: 150px">
+            <el-option label="C++" value="C++"></el-option>
+            <el-option label="Java" value="Java"></el-option>
+            <el-option label="Python" value="Python"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="标准解答">
+          <el-input
+            v-model="problemForm.referenceCode"
+            type="textarea"
+            :rows="8"
+            placeholder="标准解答源码"
+          ></el-input>
+        </el-form-item>
       </el-form>
       <template #footer>
         <span class="dialog-footer">
@@ -420,9 +448,7 @@ const problemForm = reactive({
   title: '',
   content: '',
   difficulty: '',
-  // 大类：固定类别
   problemType: '',
-  // 小类：与数据库表关联，支持多选
   typeList: [],
   timeLimitMs: 1000,
   memoryLimitMb: 128,
@@ -431,7 +457,10 @@ const problemForm = reactive({
     java: '',
     python: '',
     cpp: ''
-  }
+  },
+  validatorCode: '',
+  referenceCode: '',
+  referenceLanguage: 'C++'
 })
 
 const problemRules = {
@@ -592,6 +621,9 @@ const handleEditProblem = async (problem) => {
       python: '',
       cpp: ''
     }
+    problemForm.validatorCode = ''
+    problemForm.referenceCode = ''
+    problemForm.referenceLanguage = actualData.referenceLanguage || 'C++'
     
     console.log('赋值后problemForm:', problemForm)
     console.log('赋值后problemForm.id:', problemForm.id)

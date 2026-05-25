@@ -28,6 +28,11 @@ public class ProblemVO {
 
     private String dbSchema;
     private String dbInitData;
+    private String validatorPath;
+    private String validatorExePath;
+    private String validatorSrcHash;
+    private String referencePath;
+    private String referenceLanguage;
     private List<ProblemType> typeList;
     private LocalDateTime createdAt;
     private BigDecimal acceptance;

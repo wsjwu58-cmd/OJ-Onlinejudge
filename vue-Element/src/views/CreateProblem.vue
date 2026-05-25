@@ -81,6 +81,37 @@
             placeholder="请输入C++代码模板"
           ></el-input>
         </el-form-item>
+
+        <el-divider content-position="left">Hack 配置</el-divider>
+
+        <el-form-item label="Validator">
+          <el-input
+            v-model="problemForm.validatorCode"
+            type="textarea"
+            :rows="10"
+            placeholder="请输入 C++ Validator 源码（校验 Hack 输入数据合法性）"
+          ></el-input>
+          <div class="code-hint">从 stdin 读取数据，exit 0 表示合法，非 0 表示非法</div>
+        </el-form-item>
+
+        <el-form-item label="标答语言">
+          <el-select v-model="problemForm.referenceLanguage" placeholder="标准解答语言" style="width: 150px">
+            <el-option label="C++" value="C++"></el-option>
+            <el-option label="Java" value="Java"></el-option>
+            <el-option label="Python" value="Python"></el-option>
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="标准解答">
+          <el-input
+            v-model="problemForm.referenceCode"
+            type="textarea"
+            :rows="10"
+            placeholder="请输入标准解答源码（该题的 100% 正确解法）"
+          ></el-input>
+          <div class="code-hint">Hack 判题时用此代码运行 Hack 数据作为正确答案基准</div>
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" @click="handleSubmitForm">提交</el-button>
           <el-button @click="resetForm">重置</el-button>
@@ -115,7 +146,10 @@ const problemForm = reactive({
     java: '',
     python: '',
     cpp: ''
-  }
+  },
+  validatorCode: '',
+  referenceCode: '',
+  referenceLanguage: 'C++'
 })
 
 const problemRules = {
@@ -198,6 +232,9 @@ const resetForm = () => {
     python: '',
     cpp: ''
   }
+  problemForm.validatorCode = ''
+  problemForm.referenceCode = ''
+  problemForm.referenceLanguage = 'C++'
 }
 
 const goBack = () => {
@@ -252,5 +289,11 @@ onMounted(() => {
 
 .el-input-number {
   width: 100%;
+}
+
+.code-hint {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style>

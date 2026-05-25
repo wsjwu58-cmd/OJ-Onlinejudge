@@ -81,6 +81,17 @@ public class ContestInternalController {
         return Result.success();
     }
 
+    @PostMapping("/rank/hack")
+    public Result<Void> updateRankOnHackSuccess(
+            @RequestParam("contestId") Integer contestId,
+            @RequestParam("hackerId") Long hackerId,
+            @RequestParam("targetUserId") Long targetUserId,
+            @RequestParam("problemId") Integer problemId,
+            @RequestParam("score") Integer score) {
+        userContestService.updateRankOnHackSuccess(contestId, hackerId, targetUserId, problemId, score);
+        return Result.success();
+    }
+
     @PostMapping("/status/update")
     public Result<Void> updateContestStatus() {
         contestService.updateContestStatus();

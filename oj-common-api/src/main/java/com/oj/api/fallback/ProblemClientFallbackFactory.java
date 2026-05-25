@@ -1,6 +1,7 @@
 package com.oj.api.fallback;
 
 import com.oj.api.ProblemClient;
+import com.oj.api.dto.HackAssetsDTO;
 import com.oj.api.dto.ProblemAcceptanceFeignDTO;
 import com.oj.api.dto.ProblemFeignDTO;
 import com.oj.api.dto.TestCaseFeignDTO;
@@ -48,6 +49,18 @@ public class ProblemClientFallbackFactory implements FallbackFactory<ProblemClie
             }
             @Override
             public Result<List<ProblemAcceptanceFeignDTO>> selectAcceptanceTop10() {
+                return Result.error("题目服务调用失败: " + cause.getMessage());
+            }
+            @Override
+            public Result<HackAssetsDTO> getHackAssets(Integer problemId) {
+                return Result.error("题目服务调用失败: " + cause.getMessage());
+            }
+            @Override
+            public Result<Void> addHackTestCase(Integer problemId, Long sourceHackId, String inputData, String outputData) {
+                return Result.error("题目服务调用失败: " + cause.getMessage());
+            }
+            @Override
+            public Result<Void> updateValidatorHash(Integer problemId, String exePath, String srcHash) {
                 return Result.error("题目服务调用失败: " + cause.getMessage());
             }
         };

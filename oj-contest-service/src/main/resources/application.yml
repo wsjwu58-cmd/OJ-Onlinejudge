@@ -30,6 +30,13 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+rocketmq:
+  name-server: 192.168.141.128:9876
+  producer:
+    group: contest-producer-group
+    send-message-timeout: 10000
+    retry-times-when-send-async-failed: 2
+
 # OSS配置
 sky:
   alioss:

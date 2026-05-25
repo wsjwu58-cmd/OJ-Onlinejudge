@@ -26,6 +26,11 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -61,6 +66,10 @@ public class ProblemServiceImpl implements ProblemService {
         problemMapper.insert(problem);
 
         long id = problem.getId();
+
+        // 处理 Hack 资源文件（validator.cpp + reference.cpp）
+        saveHackFiles((int) id, problemDTO);
+
         List<ProblemType> typeList = problemDTO.getTypeList();
         List<ProblemTypesRel> typesRels = typeList.stream().map(type -> {
             ProblemTypesRel problemTypesRel = new ProblemTypesRel();
@@ -170,6 +179,10 @@ public class ProblemServiceImpl implements ProblemService {
         Problem problem = new Problem();
         BeanUtils.copyProperties(problemDTO, problem);
         problemMapper.updateById(problem);
+
+        // 处理 Hack 资源文件
+        saveHackFiles(problemDTO.getId(), problemDTO);
+
         List<ProblemType> list = problemDTO.getTypeList();
         problemTypeRel.deleteType(problemDTO.getId());
         List<ProblemTypesRel> typesRels = list.stream().map(problemType -> {
@@ -254,5 +267,64 @@ public class ProblemServiceImpl implements ProblemService {
             return problemVO;
         }).toList();
         return new PageResult(resultPage.getTotal(), problemVOList);
+    }
+
+    private void saveHackFiles(int problemId, ProblemDTO dto) {
+        try {
+            String baseDir = "E:" + File.separator + "oj-microservice" + File.separator + "hack-data" + File.separator + "problem-" + problemId;
+            Path dirPath = Paths.get(baseDir);
+            Files.createDirectories(dirPath);
+
+            String validatorPath = null;
+            String validatorExePath = null;
+            String validatorSrcHash = null;
+            String referencePath = null;
+
+            if (dto.getValidatorCode() != null && !dto.getValidatorCode().isEmpty()) {
+                validatorPath = dirPath.resolve("validator.cpp").toString();
+                Files.writeString(Paths.get(validatorPath), dto.getValidatorCode());
+                log.info("Validator 源码已写入: {}", validatorPath);
+
+                validatorExePath = dirPath.resolve("validator.exe").toString();
+                validatorSrcHash = sha256(Paths.get(validatorPath));
+            }
+
+            if (dto.getReferenceCode() != null && !dto.getReferenceCode().isEmpty()) {
+                String refLang = dto.getReferenceLanguage() != null ? dto.getReferenceLanguage() : "C++";
+                String ext = switch (refLang.toLowerCase()) {
+                    case "java" -> "java";
+                    case "python" -> "py";
+                    default -> "cpp";
+                };
+                referencePath = dirPath.resolve("reference." + ext).toString();
+                Files.writeString(Paths.get(referencePath), dto.getReferenceCode());
+                log.info("标准解答已写入: {}", referencePath);
+            }
+
+            if (validatorPath != null || referencePath != null) {
+                Problem update = new Problem();
+                update.setId(problemId);
+                update.setValidatorPath(validatorPath);
+                update.setValidatorExePath(validatorExePath);
+                update.setValidatorSrcHash(validatorSrcHash);
+                update.setReferencePath(referencePath);
+                update.setReferenceLanguage(dto.getReferenceLanguage() != null ? dto.getReferenceLanguage() : "C++");
+                problemMapper.updateById(update);
+            }
+        } catch (Exception e) {
+            log.error("写入 Hack 资源文件失败: {}", e.getMessage(), e);
+        }
+    }
+
+    private String sha256(Path file) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(Files.readAllBytes(file));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 }

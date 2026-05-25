@@ -16,6 +16,7 @@ import com.oj.contest.entity.ContestProblem;
 import com.oj.contest.mapper.ContestMapper;
 import com.oj.contest.mapper.ContestParticipantMapper;
 import com.oj.contest.mapper.ContestProblemMapper;
+import com.oj.contest.mapper.HackRecordMapper;
 import com.oj.contest.service.UserContestService;
 import com.oj.contest.vo.ContestRankVO;
 import com.oj.contest.vo.ContestVO;
@@ -24,8 +25,10 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,6 +39,8 @@ public class UserContestServiceImpl implements UserContestService {
 
     private static final String RANK_KEY_PREFIX = "contest:rank:";
     private static final String CONTEST_AC_PREFIX = "contest:ac:";
+    private static final String LOCK_KEY_PREFIX = "contest:lock:";
+    private static final String HACK_DUP_PREFIX = "contest:hack:";
 
     @Autowired
     private ContestMapper contestMapper;
@@ -47,6 +52,9 @@ public class UserContestServiceImpl implements UserContestService {
     private ContestParticipantMapper contestParticipantMapper;
 
     @Autowired
+    private HackRecordMapper hackRecordMapper;
+
+    @Autowired
     private UserClient userClient;
 
     @Autowired
@@ -54,6 +62,9 @@ public class UserContestServiceImpl implements UserContestService {
 
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
+    @Autowired
+    private DefaultRedisScript<Long> hackRankUpdateScript;
 
     @Override
     public PageResult pageContest(ContestQueryDTO contestQueryDTO) {
@@ -250,6 +261,100 @@ public class UserContestServiceImpl implements UserContestService {
         }
 
         log.info("比赛 {} 排行榜已持久化到数据库，共 {} 条", contestId, rankList.size());
+    }
+
+    @Override
+    public void lockProblem(Long contestId, Long userId, Integer problemId) {
+        String acKey = CONTEST_AC_PREFIX + contestId + ":" + userId + ":" + problemId;
+        if (!Boolean.TRUE.equals(stringRedisTemplate.hasKey(acKey))) {
+            throw new RuntimeException("请先AC该题目");
+        }
+
+        Contest contest = contestMapper.selectById(contestId.intValue());
+        if (contest == null) {
+            throw new RuntimeException("比赛不存在");
+        }
+
+        String lockKey = LOCK_KEY_PREFIX + contestId + ":" + userId + ":" + problemId;
+        Duration ttl = Duration.between(LocalDateTime.now(), contest.getEndTime());
+        if (ttl.isNegative() || ttl.isZero()) {
+            throw new RuntimeException("比赛已结束");
+        }
+        stringRedisTemplate.opsForValue().set(lockKey, "1", ttl);
+        log.info("用户 {} 锁定比赛 {} 题目 {}", userId, contestId, problemId);
+    }
+
+    @Override
+    public void unlockProblem(Long contestId, Long userId, Integer problemId) {
+        String lockKey = LOCK_KEY_PREFIX + contestId + ":" + userId + ":" + problemId;
+        stringRedisTemplate.delete(lockKey);
+        log.info("用户 {} 解锁比赛 {} 题目 {}", userId, contestId, problemId);
+    }
+
+    @Override
+    public boolean isProblemLocked(Long contestId, Long userId, Integer problemId) {
+        String lockKey = LOCK_KEY_PREFIX + contestId + ":" + userId + ":" + problemId;
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(lockKey));
+    }
+
+    @Override
+    public List<Long> getAcSubmissionIds(Integer contestId, Integer problemId, Long excludeUserId) {
+        String acKeyPrefix = CONTEST_AC_PREFIX + contestId + ":";
+        String pattern = acKeyPrefix + "*:" + problemId;
+        Set<String> keys = stringRedisTemplate.keys(pattern);
+        if (keys == null || keys.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<Long> userIds = new HashSet<>();
+        for (String key : keys) {
+            String[] parts = key.split(":");
+            if (parts.length >= 4) {
+                Long uid = Long.parseLong(parts[2]);
+                if (!uid.equals(excludeUserId)) {
+                    userIds.add(uid);
+                }
+            }
+        }
+
+        // 查询这些用户的AC提交ID（取最新的AC提交）
+        LambdaQueryWrapper<ContestParticipant> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ContestParticipant::getContestId, contestId);
+        List<ContestParticipant> participants = contestParticipantMapper.selectList(wrapper);
+        Set<Long> participantUserIds = participants.stream()
+                .map(ContestParticipant::getUserId)
+                .collect(Collectors.toSet());
+
+        List<Long> result = new ArrayList<>();
+        for (Long uid : userIds) {
+            if (participantUserIds.contains(uid)) {
+                result.add(uid);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public int getProblemScoreInContest(Integer contestId, Integer problemId) {
+        LambdaQueryWrapper<ContestProblem> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(ContestProblem::getContestId, contestId)
+                .eq(ContestProblem::getProblemId, problemId);
+        ContestProblem cp = contestProblemMapper.selectOne(wrapper);
+        return cp != null && cp.getScore() != null ? cp.getScore() : 100;
+    }
+
+    @Override
+    public void updateRankOnHackSuccess(Integer contestId, Long hackerId, Long targetUserId, Integer problemId, int score) {
+        List<String> keys = List.of(
+                RANK_KEY_PREFIX + contestId,
+                "contest:" + contestId + ":user:" + targetUserId + ":solved_count",
+                CONTEST_AC_PREFIX + contestId + ":" + targetUserId + ":" + problemId,
+                HACK_DUP_PREFIX + contestId + ":" + hackerId + ":" + targetUserId + ":" + problemId
+        );
+        stringRedisTemplate.execute(hackRankUpdateScript, keys,
+                String.valueOf(hackerId), String.valueOf(targetUserId), String.valueOf(score));
+        log.info("Hack排行更新: contest={}, hacker={}, target={}, problem={}, score={}",
+                contestId, hackerId, targetUserId, problemId, score);
     }
 
     private Map<Long, String> getUsernameMap(List<Long> userIds) {

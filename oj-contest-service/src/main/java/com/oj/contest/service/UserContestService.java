@@ -14,4 +14,11 @@ public interface UserContestService {
     List<ContestRankVO> getContestRank(Long contestId);
     void updateRankOnAccepted(Integer contestId, Long userId, Integer problemId, int problemScore);
     void persistRankToDb(Integer contestId);
+
+    void lockProblem(Long contestId, Long userId, Integer problemId);
+    void unlockProblem(Long contestId, Long userId, Integer problemId);
+    boolean isProblemLocked(Long contestId, Long userId, Integer problemId);
+    List<Long> getAcSubmissionIds(Integer contestId, Integer problemId, Long excludeUserId);
+    int getProblemScoreInContest(Integer contestId, Integer problemId);
+    void updateRankOnHackSuccess(Integer contestId, Long hackerId, Long targetUserId, Integer problemId, int score);
 }

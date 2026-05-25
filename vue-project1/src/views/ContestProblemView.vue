@@ -37,6 +37,50 @@
           <el-divider />
 
           <div class="problem-description" v-highlight v-html="processedContent"></div>
+
+          <!-- Hack 区域 -->
+          <div class="hack-section" v-if="lastJudgeStatus === 'Accepted' || isLocked">
+            <el-divider />
+            <div class="hack-header">
+              <h3>Hack 挑战</h3>
+              <el-button
+                v-if="!isLocked"
+                type="warning" size="small"
+                @click="handleLock"
+                :loading="lockLoading"
+              >
+                锁定题目
+              </el-button>
+              <el-button
+                v-else
+                type="info" size="small"
+                @click="handleUnlock"
+                :loading="unlockLoading"
+              >
+                解锁题目
+              </el-button>
+            </div>
+            <p class="hack-tip">
+              锁定后将无法再提交此题，但可查看其他AC选手的代码并发起Hack挑战。
+            </p>
+
+            <!-- AC提交列表（锁定后可见） -->
+            <div v-if="isLocked && acSubmissions.length > 0" class="ac-submissions">
+              <h4>其他选手的AC提交（{{ acSubmissions.length }}条）</h4>
+              <div v-for="sub in acSubmissions" :key="sub.id" class="submission-item">
+                <div class="sub-header">
+                  <span>用户 #{{ sub.userId }}</span>
+                  <span class="sub-lang">{{ sub.language }}</span>
+                  <span class="sub-time">{{ formatTime(sub.submitTime) }}</span>
+                  <el-button type="danger" size="small" @click="openHackDialog(sub)">
+                    发起Hack
+                  </el-button>
+                </div>
+                <pre class="sub-code" v-highlight><code>{{ sub.code }}</code></pre>
+              </div>
+            </div>
+            <el-empty v-else-if="isLocked" description="暂无其他AC提交" :image-size="60" />
+          </div>
         </div>
         <div v-else class="error-state">
           <el-empty description="题目加载失败" />
@@ -63,6 +107,48 @@
         </div>
       </div>
     </div>
+
+    <!-- Hack 提交弹窗 -->
+    <el-dialog v-model="hackDialogVisible" title="发起 Hack" width="600px" destroy-on-close>
+      <div class="hack-dialog-body">
+        <p>目标用户: <strong>#{{ hackTarget?.userId }}</strong></p>
+        <p>目标提交ID: <strong>{{ hackTarget?.id }}</strong></p>
+        <p>目标语言: <strong>{{ hackTarget?.language }}</strong></p>
+        <el-divider />
+        <div class="hack-input-area">
+          <label>测试数据（Hack Input）：</label>
+          <el-input
+            v-model="hackInput"
+            type="textarea"
+            :rows="6"
+            placeholder="请输入要测试的输入数据..."
+          />
+          <p class="input-note">数据将对目标代码和标准答案同时运行，若目标失败而标准通过则Hack成功。</p>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="hackDialogVisible = false">取消</el-button>
+        <el-button type="danger" @click="handleSubmitHack" :loading="hackSubmitting">
+          {{ hackSubmitting ? '提交中...' : '确认Hack' }}
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Hack 结果弹窗 -->
+    <el-dialog v-model="hackResultVisible" title="Hack 结果" width="500px">
+      <div class="hack-result-body">
+        <el-result
+          :icon="hackResult?.status === 'HackSuccess' ? 'success' : 'error'"
+          :title="hackResult?.status === 'HackSuccess' ? 'Hack 成功！' : 'Hack 失败'"
+          :sub-title="hackResult?.errorInfo || ''"
+        >
+          <template #extra v-if="hackResult">
+            <p>状态: {{ hackResult.status }}</p>
+            <p v-if="hackResult.targetResult">目标代码结果: {{ hackResult.targetResult }}</p>
+          </template>
+        </el-result>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -72,7 +158,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Timer } from '@element-plus/icons-vue'
 import { getProblemDetail, runCode } from '../services/api'
-import { contestSubmitApi, getContestDetailApi } from '../api/contests'
+import { contestSubmitApi, getContestDetailApi, lockProblemApi, unlockProblemApi, getAcSubmissionsApi, submitHackApi, getHackResultApi, getHackStatusApi } from '../api/contests'
 import { createSubmissionPoller } from '../api/submissions'
 import CodeEditor from '../components/CodeEditor.vue'
 
@@ -87,7 +173,22 @@ const loading = ref(true)
 const code = ref('')
 const selectedLanguage = ref('Java')
 const editorResult = ref(null)
+const lastJudgeStatus = ref(null)
 let judgePoller = null
+
+// ===== Hack 相关状态 =====
+const isLocked = ref(false)
+const lockLoading = ref(false)
+const unlockLoading = ref(false)
+const acSubmissions = ref([])
+const hackDialogVisible = ref(false)
+const hackTarget = ref(null)
+const hackInput = ref('')
+const hackSubmitting = ref(false)
+const hackResultVisible = ref(false)
+const hackResult = ref(null)
+const currentHackId = ref(null)
+let hackPollTimer = null
 
 // ===== 倒计时 =====
 const countdownText = ref('')
@@ -203,11 +304,12 @@ const handleSubmitCode = async ({ problemId: pid, code: c, language }) => {
     // 异步判题：Pending → 等 WebSocket / 轮询
     if (data.status === 'Pending') {
       editorResult.value = { status: 'Judging', message: '代码已提交，正在判题中...', statusType: 'judging' }
+      const submitTime = Date.now()
 
       judgePoller = createSubmissionPoller(pid, {
         interval: 2500,
         timeout: 120000,
-        submitToken: data.submitToken,  // 精确匹配本次提交，防止拿到旧的 AI Error 记录
+        since: submitTime,
         onResult: (latest) => {
           editorResult.value = {
             status: latest.status,
@@ -216,12 +318,20 @@ const handleSubmitCode = async ({ problemId: pid, code: c, language }) => {
             memory: latest.memoryKb != null ? latest.memoryKb + ' KB' : undefined,
             statusType: latest.status === 'Accepted' ? 'accepted' : 'error'
           }
+          if (latest.status === 'Accepted') {
+            lastJudgeStatus.value = 'Accepted'
+          }
         },
         onError: () => {
           editorResult.value = { status: 'Error', message: '获取判题结果超时，请刷新查看' }
         }
       })
       return
+    }
+
+    // 记录本次判题状态（用于判断是否可Hack）
+    if (data.status === 'Accepted') {
+      lastJudgeStatus.value = 'Accepted'
     }
 
     // 其他直接返回的结果
@@ -234,6 +344,140 @@ const handleSubmitCode = async ({ problemId: pid, code: c, language }) => {
   } catch (err) {
     editorResult.value = { status: 'Error', message: err?.message || '提交失败' }
     ElMessage.error('提交失败')
+  }
+}
+
+// ===== Hack 操作 =====
+const handleLock = async () => {
+  try {
+    lockLoading.value = true
+    const res = await lockProblemApi(contestId, problemId)
+    if (res.code === 1) {
+      isLocked.value = true
+      ElMessage.success('已锁定题目，可以查看其他选手的AC代码')
+      loadAcSubmissions()
+    } else {
+      ElMessage.error(res.msg || '锁定失败')
+    }
+  } catch (e) {
+    ElMessage.error('锁定请求失败')
+  } finally {
+    lockLoading.value = false
+  }
+}
+
+const handleUnlock = async () => {
+  try {
+    unlockLoading.value = true
+    const res = await unlockProblemApi(contestId, problemId)
+    if (res.code === 1) {
+      isLocked.value = false
+      ElMessage.success('已解锁题目')
+    } else {
+      ElMessage.error(res.msg || '解锁失败')
+    }
+  } catch (e) {
+    ElMessage.error('解锁请求失败')
+  } finally {
+    unlockLoading.value = false
+  }
+}
+
+const loadAcSubmissions = async () => {
+  try {
+    const res = await getAcSubmissionsApi(contestId, problemId)
+    if (res.code === 1) {
+      acSubmissions.value = res.data || []
+    }
+  } catch (e) {
+    console.error('加载AC提交列表失败:', e)
+  }
+}
+
+const openHackDialog = (sub) => {
+  hackTarget.value = sub
+  hackInput.value = ''
+  hackDialogVisible.value = true
+}
+
+const handleSubmitHack = async () => {
+  if (!hackInput.value.trim()) {
+    ElMessage.warning('请输入测试数据')
+    return
+  }
+  try {
+    hackSubmitting.value = true
+    const res = await submitHackApi(contestId, {
+      contestId: Number(contestId),
+      problemId: Number(problemId),
+      targetUserId: hackTarget.value.userId,
+      targetSubmissionId: hackTarget.value.id,
+      hackInput: hackInput.value
+    })
+    if (res.code === 1) {
+      const hackId = res.data
+      currentHackId.value = hackId
+      hackDialogVisible.value = false
+      ElMessage.success('Hack已提交，等待判题结果...')
+      startHackPolling(hackId)
+    } else {
+      ElMessage.error(res.msg || 'Hack提交失败')
+    }
+  } catch (e) {
+    ElMessage.error('Hack提交请求失败')
+  } finally {
+    hackSubmitting.value = false
+  }
+}
+
+const startHackPolling = (hackId) => {
+  if (hackPollTimer) clearInterval(hackPollTimer)
+  hackPollTimer = setInterval(async () => {
+    try {
+      const res = await getHackResultApi(contestId, hackId)
+      if (res.code === 1) {
+        const record = res.data
+        if (record && record.status !== 'Pending' && record.status !== 'Validating') {
+          clearInterval(hackPollTimer)
+          hackPollTimer = null
+          hackResult.value = record
+          hackResultVisible.value = true
+        }
+      }
+    } catch (e) {
+      console.error('查询Hack结果失败:', e)
+    }
+  }, 2000)
+  setTimeout(() => {
+    if (hackPollTimer) {
+      clearInterval(hackPollTimer)
+      hackPollTimer = null
+      ElMessage.warning('Hack判题超时，请稍后查看结果')
+    }
+  }, 30000)
+}
+
+const formatTime = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`
+}
+
+// ===== 检查 Hack 状态（页面加载时自动查询） =====
+const checkHackStatus = async () => {
+  try {
+    const res = await getHackStatusApi(contestId, problemId)
+    if (res.code === 1 && res.data) {
+      if (res.data.accepted) {
+        lastJudgeStatus.value = 'Accepted'
+      }
+      if (res.data.locked) {
+        isLocked.value = true
+        loadAcSubmissions()
+      }
+    }
+  } catch (e) {
+    console.error('检查Hack状态失败:', e)
   }
 }
 
@@ -257,6 +501,9 @@ const loadData = async () => {
       contest.value = contestRes.data || {}
       startCountdown()
     }
+
+    // 检查 Hack 状态：是否已AC、是否已锁定
+    checkHackStatus()
   } catch (err) {
     console.error('加载失败:', err)
     ElMessage.error('数据加载失败')
@@ -272,6 +519,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (countdownTimer) clearInterval(countdownTimer)
   if (judgePoller) judgePoller.cancel()
+  if (hackPollTimer) clearInterval(hackPollTimer)
 })
 </script>
 
@@ -406,5 +654,111 @@ onUnmounted(() => {
 
 .loading-state, .error-state, .loading-editor {
   padding: 40px;
+}
+
+/* Hack 区域样式 */
+.hack-section {
+  margin-top: 8px;
+}
+
+.hack-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.hack-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6a23c;
+  margin: 0;
+}
+
+.hack-tip {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 12px;
+}
+
+.ac-submissions {
+  margin-top: 12px;
+}
+
+.ac-submissions h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 8px;
+}
+
+.submission-item {
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.sub-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.sub-lang {
+  color: #1890ff;
+  font-size: 12px;
+  background: #e6f7ff;
+  padding: 1px 8px;
+  border-radius: 4px;
+}
+
+.sub-time {
+  color: #8c8c8c;
+  font-size: 12px;
+  flex: 1;
+}
+
+.sub-code {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+  margin: 0;
+}
+
+.sub-code code {
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.hack-dialog-body {
+  font-size: 14px;
+}
+
+.hack-input-area {
+  margin-top: 8px;
+}
+
+.hack-input-area label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.input-note {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-top: 6px;
+}
+
+.hack-result-body {
+  text-align: center;
 }
 </style>
