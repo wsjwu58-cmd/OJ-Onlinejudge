@@ -34,7 +34,7 @@ spring:
 langchain4j:
   open-ai:
     embedding-model:
-      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      api-key: 
       base-url: https://api.siliconflow.cn/v1
       model-name: BAAI/bge-large-zh-v1.5
   embedding-store:
@@ -44,9 +44,9 @@ langchain4j:
 sky:
   alioss:
     endpoint: oss-cn-beijing.aliyuncs.com
-    access-key-id: LTAI5tM9m2ttz588LxyfZR9A
-    access-key-secret: VhkWLyiq6J658RjS8XjW2Tem4cdLcn
-    bucket-name: wsj123
+    access-key-id: 
+    access-key-secret: 
+    bucket-name: 
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
