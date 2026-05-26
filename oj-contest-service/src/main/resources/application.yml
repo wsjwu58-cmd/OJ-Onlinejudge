@@ -41,9 +41,9 @@ rocketmq:
 sky:
   alioss:
     endpoint: oss-cn-beijing.aliyuncs.com
-    access-key-id: LTAI5tM9m2ttz588LxyfZR9A
-    access-key-secret: VhkWLyiq6J658RjS8XjW2Tem4cdLcn
-    bucket-name: wsj123
+    access-key-id:
+    access-key-secret: 
+    bucket-name: 
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
