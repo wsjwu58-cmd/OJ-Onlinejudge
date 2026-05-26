@@ -24,7 +24,7 @@ spring:
 langchain4j:
   open-ai:
     chat-model:
-      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      api-key: 
       base-url: https://api.siliconflow.cn/v1
       model-name: Qwen/Qwen3-Coder-30B-A3B-Instruct
       temperature: 0.7
@@ -32,14 +32,14 @@ langchain4j:
       log-requests: true
       log-responses: true
     streaming-chat-model:
-      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      api-key:
       base-url: https://api.siliconflow.cn/v1
       model-name: Qwen/Qwen3-Coder-30B-A3B-Instruct
       temperature: 0.7
       log-requests: true
       log-responses: true
     embedding-model:
-      api-key: sk-lkwtccrympupzlgcncgvjmnodewoopvohmcmxazaykqvkobi
+      api-key: 
       base-url: https://api.siliconflow.cn/v1
       model-name: BAAI/bge-large-zh-v1.5
       log-requests: true
