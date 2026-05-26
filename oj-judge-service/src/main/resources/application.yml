@@ -50,9 +50,9 @@ mybatis-plus:
 sky:
   alioss:
     endpoint: oss-cn-beijing.aliyuncs.com
-    access-key-id: LTAI5tM9m2ttz588LxyfZR9A
-    access-key-secret: VhkWLyiq6J658RjS8XjW2Tem4cdLcn
-    bucket-name: wsj123
+    access-key-id: 
+    access-key-secret: 
+    bucket-name: 
   judge0:
     api-url: http://192.168.141.128:2358
     api-key: ""
