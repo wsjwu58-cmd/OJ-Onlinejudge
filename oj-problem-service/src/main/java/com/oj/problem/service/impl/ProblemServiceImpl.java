@@ -32,7 +32,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -41,6 +42,8 @@ public class ProblemServiceImpl implements ProblemService {
     private ProblemMapper problemMapper;
     @Autowired
     private ProblemTypeRelMapper problemTypeRel;
+    @Autowired
+    private ProblemTypeMapper problemTypeMapper;
     @Autowired
     private Parser parser;
     @Autowired
@@ -107,12 +110,37 @@ public class ProblemServiceImpl implements ProblemService {
         lambdaQueryWrapper.like(title != null && !title.isEmpty(), Problem::getTitle, title)
                 .eq(difficulty != null && !difficulty.isEmpty(), Problem::getDifficulty, difficulty);
         Page<ProblemVO> problemVOPage1 = problemMapper.selectPage(problemVOPage, lambdaQueryWrapper);
-        List<ProblemVO> list = problemVOPage1.getRecords().stream().map(problemVO -> {
-            List<ProblemType> typeList = problemMapper.selectPageOf(problemVO.getId());
-            problemVO.setTypeList(typeList);
-            return problemVO;
-        }).toList();
-        return new PageResult(problemVOPage1.getTotal(), list);
+        List<ProblemVO> records = problemVOPage1.getRecords();
+
+        if (!records.isEmpty()) {
+            List<Long> problemIds = records.stream()
+                    .map(ProblemVO::getId)
+                    .toList();
+
+            List<ProblemTypesRel> allRels = problemMapper.selectTypeListBatch(problemIds);
+            if (!allRels.isEmpty()) {
+                Set<Integer> typeIds = allRels.stream()
+                        .map(ProblemTypesRel::getTypeId)
+                        .collect(Collectors.toSet());
+                List<ProblemType> allTypes = problemTypeMapper.selectBatchIds(typeIds);
+                Map<Integer, ProblemType> typeMap = allTypes.stream()
+                        .collect(Collectors.toMap(ProblemType::getId, t -> t));
+
+                Map<Long, List<ProblemType>> problemTypeMap = allRels.stream()
+                        .collect(Collectors.groupingBy(
+                                rel -> rel.getProblemId().longValue(),
+                                Collectors.mapping(rel -> typeMap.get(rel.getTypeId()),
+                                        Collectors.filtering(Objects::nonNull, Collectors.toList()))
+                        ));
+
+                records.forEach(vo -> vo.setTypeList(
+                        problemTypeMap.getOrDefault(vo.getId(), Collections.emptyList())));
+            } else {
+                records.forEach(vo -> vo.setTypeList(Collections.emptyList()));
+            }
+        }
+
+        return new PageResult(problemVOPage1.getTotal(), records);
     }
 
     @Override
@@ -218,11 +246,10 @@ public class ProblemServiceImpl implements ProblemService {
         }
 
         try {
-            for (Long id : ids) {
-                var result = contestClient.countContestByProblemId(Math.toIntExact(id));
-                if (result.getData() != null && result.getData() > 0) {
-                    throw new DeletionNotAllowedException(MessageConstant.CONTEXT_PROBLEM);
-                }
+            List<Integer> intIds = ids.stream().map(Long::intValue).toList();
+            var result = contestClient.countContestByProblemIds(intIds);
+            if (result != null && result.getData() != null && !result.getData().isEmpty()) {
+                throw new DeletionNotAllowedException(MessageConstant.CONTEXT_PROBLEM);
             }
         } catch (DeletionNotAllowedException e) {
             throw e;
@@ -258,15 +285,42 @@ public class ProblemServiceImpl implements ProblemService {
             }
         }
         Page<Problem> resultPage = problemMapper.selectPage(problemPage, lambdaQueryWrapper);
-        List<ProblemVO> problemVOList = resultPage.getRecords().stream().map(problem -> {
+        List<ProblemVO> records = resultPage.getRecords().stream().map(problem -> {
             ProblemVO problemVO = new ProblemVO();
             BeanUtils.copyProperties(problem, problemVO);
             problemVO.setId(Long.valueOf(problem.getId()));
-            List<ProblemType> typeList = problemMapper.selectPageOf(Long.valueOf(problem.getId()));
-            problemVO.setTypeList(typeList);
             return problemVO;
         }).toList();
-        return new PageResult(resultPage.getTotal(), problemVOList);
+
+        if (!records.isEmpty()) {
+            List<Long> problemIds = records.stream()
+                    .map(ProblemVO::getId)
+                    .toList();
+
+            List<ProblemTypesRel> allRels = problemMapper.selectTypeListBatch(problemIds);
+            if (!allRels.isEmpty()) {
+                Set<Integer> typeIds = allRels.stream()
+                        .map(ProblemTypesRel::getTypeId)
+                        .collect(Collectors.toSet());
+                List<ProblemType> allTypes = problemTypeMapper.selectBatchIds(new ArrayList<>(typeIds));
+                Map<Integer, ProblemType> typeMap = allTypes.stream()
+                        .collect(Collectors.toMap(ProblemType::getId, t -> t));
+
+                Map<Long, List<ProblemType>> problemTypeMap = allRels.stream()
+                        .collect(Collectors.groupingBy(
+                                rel -> rel.getProblemId().longValue(),
+                                Collectors.mapping(rel -> typeMap.get(rel.getTypeId()),
+                                        Collectors.filtering(Objects::nonNull, Collectors.toList()))
+                        ));
+
+                records.forEach(vo -> vo.setTypeList(
+                        problemTypeMap.getOrDefault(vo.getId(), Collections.emptyList())));
+            } else {
+                records.forEach(vo -> vo.setTypeList(Collections.emptyList()));
+            }
+        }
+
+        return new PageResult(resultPage.getTotal(), records);
     }
 
     private void saveHackFiles(int problemId, ProblemDTO dto) {

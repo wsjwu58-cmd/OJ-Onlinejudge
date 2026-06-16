@@ -140,13 +140,15 @@ public class ContestServiceImpl implements ContestService {
     @Override
     public void deleteId(Long id) {
         List<Long> problemIds = contestProblemMapper.selectListAll(id);
-        // 通过Feign检查题目是否发布
-        for (Long problemId : problemIds) {
-            Result<ProblemFeignDTO> result = problemClient.getProblemById(problemId.intValue());
-            if (result != null && result.getData() != null
-                    && result.getData().getStatus() != null
-                    && result.getData().getStatus() == StatusConstant.ENABLE) {
-                throw new DeletionNotAllowedException(MessageConstant.CONTEXT_PROBLEM);
+        if (!problemIds.isEmpty()) {
+            Result<List<ProblemFeignDTO>> result = problemClient.getProblemsByIds(
+                    problemIds.stream().map(Long::intValue).toList());
+            if (result != null && result.getData() != null) {
+                for (ProblemFeignDTO p : result.getData()) {
+                    if (p.getStatus() != null && p.getStatus() == StatusConstant.ENABLE) {
+                        throw new DeletionNotAllowedException(MessageConstant.CONTEXT_PROBLEM);
+                    }
+                }
             }
         }
         contestMapper.deleteById(id);
@@ -155,15 +157,12 @@ public class ContestServiceImpl implements ContestService {
 
     @Override
     public void updateContestStatus() {
-        List<Contest> contestList = contestMapper.selectList(null);
         LocalDateTime now = LocalDateTime.now();
-        contestList.forEach(contest -> {
-            String newStatus = calculateStatus(contest, now);
-            if (!contest.getStatus().equals(newStatus)) {
-                contest.setStatus(newStatus);
-                contestMapper.updateById(contest);
-            }
-        });
+
+        contestMapper.batchUpdateStatus(
+                "Upcoming", now,
+                "Running", now,
+                "Ended", now);
     }
 
     private String calculateStatus(Contest contest, LocalDateTime now) {

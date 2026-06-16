@@ -3,7 +3,7 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <mapper namespace="com.oj.user.mapper.UserMapper">
     <select id="countUserToday" resultType="java.lang.Integer">
-        select count(id) from exercise.user
+        select count(id) from user
         <where>
             <if test="begin!=null">
                 and last_login_time &gt;=#{begin}
@@ -14,11 +14,11 @@
         </where>
     </select>
     <select id="countUserBeforeToday" resultType="java.lang.Integer">
-        select count(id) from exercise.user
+        select count(id) from user
         where last_login_time &lt; #{localDate}
     </select>
     <select id="countCreateUser" resultType="java.lang.Integer">
-        select count(id) from exercise.user
+        select count(id) from user
         <where>
             <if test="begin!=null">
                 and created_at &gt;=#{begin}

@@ -7,6 +7,8 @@ import com.oj.common.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @FeignClient(name = "oj-contest-service", fallbackFactory = ContestClientFallbackFactory.class)
 public interface ContestClient {
     @GetMapping("/internal/contest/problem")
@@ -20,6 +22,9 @@ public interface ContestClient {
 
     @GetMapping("/internal/contest/problem/count")
     Result<Long> countContestByProblemId(@RequestParam("problemId") Integer problemId);
+
+    @PostMapping("/internal/contest/problem/count-batch")
+    Result<List<Long>> countContestByProblemIds(@RequestBody List<Integer> problemIds);
 
     @PostMapping("/internal/contest/rank/hack")
     Result<Void> updateRankOnHackSuccess(@RequestParam("contestId") Integer contestId,

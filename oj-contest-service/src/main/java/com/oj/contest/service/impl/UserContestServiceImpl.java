@@ -76,13 +76,25 @@ public class UserContestServiceImpl implements UserContestService {
                 .like(title != null && !title.isEmpty(), "c.title", title);
         Page<ContestVO> result = contestMapper.selectPage(page, wrapper);
 
-        // 填充创建者名称 + 参赛人数
-        fillCreatedName(result.getRecords());
-        for (ContestVO vo : result.getRecords()) {
-            vo.setParticipantCount(contestParticipantMapper.countByContest(vo.getId()));
+        List<ContestVO> records = result.getRecords();
+        if (!records.isEmpty()) {
+            fillCreatedName(records);
+
+            List<Integer> contestIds = records.stream()
+                    .map(ContestVO::getId)
+                    .toList();
+            List<Map<String, Object>> countResults = contestParticipantMapper.countByContestBatch(contestIds);
+            Map<Integer, Integer> countMap = new HashMap<>();
+            for (Map<String, Object> row : countResults) {
+                Integer cid = ((Number) row.get("contest_id")).intValue();
+                Integer cnt = ((Number) row.get("cnt")).intValue();
+                countMap.put(cid, cnt);
+            }
+            records.forEach(vo -> vo.setParticipantCount(
+                    countMap.getOrDefault(vo.getId(), 0)));
         }
 
-        return new PageResult(result.getTotal(), result.getRecords());
+        return new PageResult(result.getTotal(), records);
     }
 
     @Override

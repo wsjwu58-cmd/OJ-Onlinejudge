@@ -11,6 +11,14 @@
                  INNER JOIN problem_types_rel ptr ON pt.id = ptr.type_id
         WHERE ptr.problem_id = #{id}
     </select>
+    <select id="selectTypeListBatch" resultType="com.oj.problem.entity.ProblemTypesRel">
+        SELECT ptr.*
+        FROM problem_types_rel ptr
+        WHERE ptr.problem_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
     <select id="countProblem" resultType="java.lang.Integer">
         select count(id) from exercise.problems
         <where>

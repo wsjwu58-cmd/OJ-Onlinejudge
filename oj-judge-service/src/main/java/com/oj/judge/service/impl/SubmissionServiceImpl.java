@@ -20,7 +20,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -39,12 +40,28 @@ public class SubmissionServiceImpl implements SubmissionService {
     public List<JudgeResultVO> getSubmission(Long problemId) {
         Long currentId = BaseContext.getCurrentId();
         List<JudgeResultVO> list = submissionMapper.selectSubmission(currentId, problemId);
-        list.forEach(vo -> {
-            Result<ProblemFeignDTO> result = problemClient.getProblemById(vo.getProblemId());
-            if (result != null && result.getData() != null) {
-                vo.setTitle(result.getData().getTitle());
+
+        if (!list.isEmpty()) {
+            Set<Integer> problemIds = list.stream()
+                    .map(JudgeResultVO::getProblemId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            if (!problemIds.isEmpty()) {
+                Result<List<ProblemFeignDTO>> batchResult = problemClient.getProblemsByIds(
+                        new ArrayList<>(problemIds));
+                if (batchResult != null && batchResult.getData() != null) {
+                    Map<Integer, String> titleMap = batchResult.getData().stream()
+                            .collect(Collectors.toMap(ProblemFeignDTO::getId,
+                                    p -> p.getTitle() != null ? p.getTitle() : "",
+                                    (a, b) -> a));
+                    list.forEach(vo -> {
+                        String title = titleMap.get(vo.getProblemId());
+                        if (title != null) vo.setTitle(title);
+                    });
+                }
             }
-        });
+        }
         return list;
     }
 
@@ -61,16 +78,45 @@ public class SubmissionServiceImpl implements SubmissionService {
         List<SubmissionVO> list = submissionPage.getRecords().stream().map(submission -> {
             SubmissionVO vo = new SubmissionVO();
             BeanUtils.copyProperties(submission, vo);
-            Result<UserFeignDTO> userResult = userClient.getUserById(submission.getUserId());
-            if (userResult != null && userResult.getData() != null) {
-                vo.setUsername(userResult.getData().getUsername());
-            }
-            Result<ProblemFeignDTO> problemResult = problemClient.getProblemById(submission.getProblemId());
-            if (problemResult != null && problemResult.getData() != null) {
-                vo.setProblemTitle(problemResult.getData().getTitle());
-            }
             return vo;
         }).toList();
+
+        if (!list.isEmpty()) {
+            Set<Long> userIds = list.stream()
+                    .map(SubmissionVO::getUserId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+            Set<Integer> problemIds = list.stream()
+                    .map(SubmissionVO::getProblemId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            Map<Long, String> usernameMap = Collections.emptyMap();
+            if (!userIds.isEmpty()) {
+                Result<List<UserFeignDTO>> userResult = userClient.getUsersByIds(new ArrayList<>(userIds));
+                if (userResult != null && userResult.getData() != null) {
+                    usernameMap = userResult.getData().stream()
+                            .collect(Collectors.toMap(UserFeignDTO::getId, UserFeignDTO::getUsername, (a, b) -> a));
+                }
+            }
+
+            Map<Integer, String> titleMap = Collections.emptyMap();
+            if (!problemIds.isEmpty()) {
+                Result<List<ProblemFeignDTO>> problemResult = problemClient.getProblemsByIds(
+                        new ArrayList<>(problemIds));
+                if (problemResult != null && problemResult.getData() != null) {
+                    titleMap = problemResult.getData().stream()
+                            .collect(Collectors.toMap(ProblemFeignDTO::getId,
+                                    p -> p.getTitle() != null ? p.getTitle() : "",
+                                    (a, b) -> a));
+                }
+            }
+
+            for (SubmissionVO vo : list) {
+                vo.setUsername(usernameMap.get(vo.getUserId()));
+                vo.setProblemTitle(titleMap.get(vo.getProblemId()));
+            }
+        }
 
         return new PageResult(submissionPage.getTotal(), list);
     }
@@ -81,14 +127,21 @@ public class SubmissionServiceImpl implements SubmissionService {
         if (submission == null) return null;
         SubmissionVO vo = new SubmissionVO();
         BeanUtils.copyProperties(submission, vo);
-        Result<UserFeignDTO> userResult = userClient.getUserById(submission.getUserId());
-        if (userResult != null && userResult.getData() != null) {
-            vo.setUsername(userResult.getData().getUsername());
+
+        Set<Long> userIds = Set.of(submission.getUserId());
+        Set<Integer> problemIds = Set.of(submission.getProblemId());
+
+        Result<List<UserFeignDTO>> userResult = userClient.getUsersByIds(new ArrayList<>(userIds));
+        if (userResult != null && userResult.getData() != null && !userResult.getData().isEmpty()) {
+            vo.setUsername(userResult.getData().get(0).getUsername());
         }
-        Result<ProblemFeignDTO> problemResult = problemClient.getProblemById(submission.getProblemId());
-        if (problemResult != null && problemResult.getData() != null) {
-            vo.setProblemTitle(problemResult.getData().getTitle());
+
+        Result<List<ProblemFeignDTO>> problemResult = problemClient.getProblemsByIds(
+                new ArrayList<>(problemIds));
+        if (problemResult != null && problemResult.getData() != null && !problemResult.getData().isEmpty()) {
+            vo.setProblemTitle(problemResult.getData().get(0).getTitle());
         }
+
         return vo;
     }
 

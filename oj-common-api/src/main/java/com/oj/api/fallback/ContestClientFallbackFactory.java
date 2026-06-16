@@ -8,6 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.openfeign.FallbackFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @Slf4j
 public class ContestClientFallbackFactory implements FallbackFactory<ContestClient> {
@@ -29,6 +31,10 @@ public class ContestClientFallbackFactory implements FallbackFactory<ContestClie
             }
             @Override
             public Result<Long> countContestByProblemId(Integer problemId) {
+                return Result.error("竞赛服务调用失败: " + cause.getMessage());
+            }
+            @Override
+            public Result<List<Long>> countContestByProblemIds(List<Integer> problemIds) {
                 return Result.error("竞赛服务调用失败: " + cause.getMessage());
             }
             @Override

@@ -15,4 +15,14 @@
             </if>
         </where>
     </select>
+
+    <!-- 批量更新比赛状态：一次SQL替代 N 次 updateById -->
+    <update id="batchUpdateStatus">
+        UPDATE contests
+        SET status = CASE
+            WHEN start_time &gt; #{now1} THEN #{upcomingStatus}
+            WHEN start_time &lt;= #{now2} AND end_time &gt; #{now2} THEN #{runningStatus}
+            ELSE #{endedStatus}
+        END
+    </update>
 </mapper>

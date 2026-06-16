@@ -75,6 +75,11 @@ public class ContestInternalController {
         return Result.success(contestProblemMapper.selectContentCount(Long.valueOf(problemId)));
     }
 
+    @PostMapping("/problem/count-batch")
+    public Result<List<Long>> countContestByProblemIds(@RequestBody List<Integer> problemIds) {
+        return Result.success(contestProblemMapper.selectContentCountBatch(problemIds));
+    }
+
     @PostMapping("/persist-rank")
     public Result<Void> persistRank(@RequestParam("contestId") Integer contestId) {
         userContestService.persistRankToDb(contestId);

@@ -22,6 +22,8 @@ public interface ProblemMapper extends BaseMapper<Problem> {
 
     List<ProblemType> selectPageOf(Long id);
 
+    List<ProblemTypesRel> selectTypeListBatch(@Param("ids") List<Long> ids);
+
     @Select("select * from problems")
     List<Problem> selectAll();
 
