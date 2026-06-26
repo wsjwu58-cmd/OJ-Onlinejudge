@@ -42,9 +42,9 @@ async def sse_stream(messages: list, chat_model) -> EventSourceResponse:
         try:
             async for chunk in chat_model.astream(messages):
                 if chunk.content:
-                    yield {"event": "message", "data": chunk.content}
+                    yield {"data": chunk.content}
         except Exception as e:
-            yield {"event": "message", "data": f"AI处理出错: {str(e)}"}
+            yield {"data": f"AI处理出错: {str(e)}"}
         yield {"event": "done", "data": ""}
 
     return EventSourceResponse(event_generator())
@@ -66,7 +66,7 @@ async def stream_judge(token: str):
     data = await get_token_data(token)
     if not data:
         async def err():
-            yield {"event": "message", "data": "任务不存在或已过期"}
+            yield {"data": "任务不存在或已过期"}
             yield {"event": "done", "data": ""}
         return EventSourceResponse(err())
 
@@ -100,7 +100,7 @@ async def stream_syntax_check(token: str):
     data = await get_token_data(token)
     if not data:
         async def err():
-            yield {"event": "message", "data": "任务不存在或已过期"}
+            yield {"data": "任务不存在或已过期"}
             yield {"event": "done", "data": ""}
         return EventSourceResponse(err())
 
@@ -123,7 +123,7 @@ async def stream_analyze_error(token: str):
     data = await get_token_data(token)
     if not data:
         async def err():
-            yield {"event": "message", "data": "任务不存在或已过期"}
+            yield {"data": "任务不存在或已过期"}
             yield {"event": "done", "data": ""}
         return EventSourceResponse(err())
 
@@ -160,7 +160,7 @@ async def stream_chat(token: str):
     data = await get_token_data(token)
     if not data:
         async def err():
-            yield {"event": "message", "data": "任务不存在或已过期"}
+            yield {"data": "任务不存在或已过期"}
             yield {"event": "done", "data": ""}
         return EventSourceResponse(err())
 
@@ -205,9 +205,9 @@ async def stream_chat(token: str):
             async for chunk in chat_model.astream(messages):
                 if chunk.content:
                     full_response += chunk.content
-                    yield {"event": "message", "data": chunk.content}
+                    yield {"data": chunk.content}
         except Exception as e:
-            yield {"event": "message", "data": f"AI回复出错: {str(e)}"}
+            yield {"data": f"AI回复出错: {str(e)}"}
         if full_response:
             await save_dialog(uid, pid, "assistant", full_response)
         yield {"event": "done", "data": ""}
@@ -225,7 +225,7 @@ async def stream_hint(token: str):
     data = await get_token_data(token)
     if not data:
         async def err():
-            yield {"event": "message", "data": "任务不存在或已过期"}
+            yield {"data": "任务不存在或已过期"}
             yield {"event": "done", "data": ""}
         return EventSourceResponse(err())
 

@@ -25,6 +25,10 @@ class Settings(BaseSettings):
 
     gateway_url: str = "http://localhost:8080"
 
+    problem_service_url: str = "http://localhost:8082"
+    judge_service_url: str = "http://localhost:8084"
+    user_service_url: str = "http://localhost:8081"
+
     agent_use_langgraph: bool = True
     mcp_bing_enabled: bool = False
 

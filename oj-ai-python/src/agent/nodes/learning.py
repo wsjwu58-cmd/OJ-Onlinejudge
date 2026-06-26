@@ -1,27 +1,9 @@
-"""Learning节点 - 学情分析"""
-from src.agent.state import AgentState
-from src.agent.tools.learning import get_user_submission_stats, get_user_progress
-from src.deps import get_chat_model
+"""Learning节点 v2 — ReAct循环，获取用户数据后分析学情"""
+from src.agent.nodes._react import react_node
+from src.agent.tools import LEARNING_TOOLS
 
 
-async def learning_node(state: AgentState) -> AgentState:
-    task = state.get("task", "")
-    user_id_str = state.get("user_id", "0")
-    chat_model = get_chat_model()
-
-    try:
-        user_id = int(user_id_str) if user_id_str != "0" else 0
-    except (ValueError, TypeError):
-        user_id = 0
-
-    if user_id > 0:
-        stats = await get_user_submission_stats(user_id, 30)
-        progress = await get_user_progress(user_id)
-        prompt = f"用户问题：{task}\n\n统计数据：\n{stats}\n\n进度：\n{progress}\n\n请分析用户的学习情况。"
-    else:
-        prompt = f"用户问题：{task}\n\n请给出通用的学习建议。"
-
-    response = await chat_model.ainvoke(prompt)
-    state["learning_result"] = response.content
-    state["next"] = "supervisor"
-    return state
+async def learning_node(state):
+    return await react_node(state, LEARNING_TOOLS,
+        "你是专业的OJ学情分析助手。获取用户提交统计和进度数据，分析薄弱点并给出建议。",
+        "learning_result")

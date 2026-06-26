@@ -1,21 +1,9 @@
-"""Solution节点 - 题解生成"""
-from src.agent.state import AgentState
-from src.agent.tools.solution import get_problem_detail, get_test_cases
-from src.deps import get_chat_model
+"""Solution节点 v2 — ReAct循环，获取题目详情后生成题解"""
+from src.agent.nodes._react import react_node
+from src.agent.tools import SOLUTION_TOOLS
 
 
-async def solution_node(state: AgentState) -> AgentState:
-    task = state.get("task", "")
-    problem_id = state.get("problem_id")
-    chat_model = get_chat_model()
-
-    if problem_id:
-        detail = await get_problem_detail(problem_id)
-        prompt = f"用户问题：{task}\n\n题目详情：\n{detail}\n\n请基于题目详情生成解题思路和参考代码。"
-    else:
-        prompt = f"用户问题：{task}\n\n请为用户提供解题建议。"
-
-    response = await chat_model.ainvoke(prompt)
-    state["solution_result"] = response.content
-    state["next"] = "supervisor"
-    return state
+async def solution_node(state):
+    return await react_node(state, SOLUTION_TOOLS,
+        "你是专业的OJ题解助手。先获取题目详情，再生成解题思路和参考代码。",
+        "solution_result")

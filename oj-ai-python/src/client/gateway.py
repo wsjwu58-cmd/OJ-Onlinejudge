@@ -1,6 +1,9 @@
 """Gateway基础HTTP客户端 - 封装认证头X-User-Id/X-User-Role"""
+import logging
 import httpx
 from src.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class GatewayClient:
@@ -12,7 +15,7 @@ class GatewayClient:
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None:
-            self._client = httpx.AsyncClient(timeout=30.0)
+            self._client = httpx.AsyncClient(timeout=10.0)
         return self._client
 
     async def get(self, path: str, user_id: str | None = None, user_role: str | None = None) -> dict:
@@ -23,7 +26,9 @@ class GatewayClient:
             headers["X-User-Id"] = user_id
         if user_role:
             headers["X-User-Role"] = user_role
-        resp = await client.get(f"{self.base_url}{path}", headers=headers)
+        url = f"{self.base_url}{path}"
+        logger.info(f"Gateway GET: {url}")
+        resp = await client.get(url, headers=headers)
         resp.raise_for_status()
         return resp.json()
 

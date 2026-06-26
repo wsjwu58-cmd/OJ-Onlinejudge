@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 uv.lock
 .pytest_cache/
+*.db
